@@ -1,0 +1,21 @@
+#################################################################
+###                     SAIGEgds Codes                        ###
+###                                                           ###
+
+# use C++11
+CXX_STD = CXX11
+
+# additional preprocessor options
+PKG_CXXFLAGS = $(PKG_CXXFLAGS) -DRCPP_PARALLEL_USE_TBB=1
+
+# to set flags for the linker
+PKG_LIBS = -lm $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) \
+	$(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript.exe" -e "RcppParallel::RcppParallelLibs()") \
+	$(shell ${R_HOME}/bin/Rscript -e \
+	"if (grepl(intToUtf8(c(94,103,92,43,92,43)), basename('$(CXX)'))) cat('-lgcc')")
+
+all: $(SHLIB)
+
+clean:
+	rm -f ../.travis.yml
+	rm -f ../.gitignore

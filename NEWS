@@ -1,0 +1,16 @@
+CHANGES IN VERSION 0.9.9 (07-24-2019)
+-------------------------
+
+    o add a vignette to the package
+
+
+CHANGES IN VERSION 0.9.7 (06-08-2019)
+-------------------------
+
+    o seqAssocGLMM_SPA(): load balancing in parallel
+
+
+CHANGES IN VERSION 0.9.0 (01-07-2019)
+-------------------------
+
+    o first release of SAIGEgds

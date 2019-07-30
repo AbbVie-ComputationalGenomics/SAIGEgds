@@ -1,0 +1,24 @@
+# Export the following names
+useDynLib(SAIGEgds,
+    saige_score_test_init,
+    saige_simd_version,
+    saige_store_2b_geno,
+    saige_store_sp_geno,
+    saige_fit_AI_PCG_binary, saige_fit_AI_PCG_quant,
+    saige_calc_var_ratio_binary, saige_calc_var_ratio_quant
+)
+
+# Export all names
+exportPattern("^seq*")
+
+# Import all packages listed as Imports or Depends
+import(methods)
+import(Rcpp)
+importFrom(stats, as.formula, binomial, gaussian, glm, lm, model.frame, model.matrix,
+    model.response, na.omit, sd, var)
+importFrom(utils, object.size, packageVersion)
+importFrom(gdsfmt, createfn.gds, openfn.gds, closefn.gds, index.gdsn, ls.gdsn,
+    add.gdsn, read.gdsn, readex.gdsn, readmode.gdsn, put.attr.gdsn, get.attr.gdsn)
+importFrom(SeqArray, seqOpen, seqClose, seqGetData, seqApply, seqSummary,
+    seqParallel, seqResetFilter, seqSetFilter, seqGetFilter, seqSetFilterCond)
+importFrom(RcppParallel, setThreadOptions, RcppParallelLibs)

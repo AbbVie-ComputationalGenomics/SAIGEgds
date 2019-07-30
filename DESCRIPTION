@@ -1,0 +1,27 @@
+Package: SAIGEgds
+Type: Package
+Title: Scalable Implementation of Generalized mixed models using GDS files
+Version: 0.9.9
+Date: 2019-07-30
+Depends: R (>= 3.0), gdsfmt (>= 1.10.0), SeqArray (>= 1.24.1), Rcpp
+LinkingTo: Rcpp, RcppArmadillo, RcppParallel
+Imports: methods, RcppParallel, SPAtest (>= 3.0.0)
+Suggests: parallel, crayon, RUnit, knitr, BiocGenerics, SNPRelate
+Authors@R: c(person("Xiuwen", "Zheng", role=c("aut", "cre"),
+        email="xiuwen.zheng@abbvie.com"),
+        person("Wei", "Zhou", role="ctb",
+        comment="the original author of the SAIGE R package"),
+        person("J. Wade", "Davis", role="ctb"))
+Description: Scalable and accurate implementation of generalized mixed models
+        with the support of Genomic Data Structure (GDS) files and highly optimized
+        C++ implementation. It is designed for single variant tests in large-scale
+        phenome-wide association studies (PheWAS) with millions of variants and
+        thousands of samples. The implementation is based on the original SAIGE R
+        package (v0.29.4.4). SAIGEgds also implements some of the SPAtest functions in
+        C to speed up the calculation of Saddlepoint Approximation.
+License: GPL-3
+SystemRequirements: C++11, GNU make
+VignetteBuilder: knitr
+URL: http://github.com/AbbVie-ComputationalGenomics/SAIGEgds
+BugReports: http://github.com/AbbVie-ComputationalGenomics/SAIGEgds/issues
+biocViews: Genetics, StatisticalMethod
