@@ -31,6 +31,10 @@ library(SAIGEgds)
 
 test.saige_fit_null_model <- function()
 {
+	# 'Rounding' was the default in versions prior to R_3.6.0
+	# it is used for reproduction of the results created by R (v3.5.2)
+	suppressWarnings(RNGkind("Mersenne-Twister", "Inversion", "Rounding"))
+
 	# load the previous model
 	mod <- get(load(system.file("unitTests/saige_model.rda", package="SAIGEgds")))
 

@@ -166,7 +166,7 @@ unlink("grm_geno.gds", force=TRUE)
 
 1. Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S. Efficiently controlling for case-control imbalance and sample relatedness in large-scale genetic association studies. *Nat Genet* (2018). Sep;50(9):1335-1341.
 
-2. Zheng X, Davis J.Wade, SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models; (Abstract 1920276). Presented at the 69th Annual Meeting of The American Society of Human Genetics (ASHG), Oct 15-19, Houston, US.
+2. Zheng X, Davis J.Wade, SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models; (Abstract 1920276). *The Annual Meeting of The American Society of Human Genetics (ASHG)*, Oct 15-19, 2019, Houston, US.
 
 3. Zheng X, Gogarten S, Lawrence M, Stilp A, Conomos M, Weir BS, Laurie C, Levine D. SeqArray -- A storage-efficient high-performance data format for WGS variant calls. *Bioinformatics* (2017). [DOI: 10.1093/bioinformatics/btx145](http://dx.doi.org/10.1093/bioinformatics/btx145).
 

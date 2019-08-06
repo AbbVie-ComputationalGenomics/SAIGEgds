@@ -3,6 +3,11 @@ CHANGES IN VERSION 0.9.9 (07-24-2019)
 
     o add a vignette to the package
 
+    o the default of random number generator changes in R: "Rounding" was the default
+      in `RNGkind()` prior to R_3.6.0, but "Rejection" is used in R (>= v3.6.0). For
+      reproduction of the results created by R (< v3.6.0), please use
+      `RNGkind("Mersenne-Twister", "Inversion", "Rounding")` in R (>= v3.6.0)
+
 
 CHANGES IN VERSION 0.9.7 (06-08-2019)
 -------------------------

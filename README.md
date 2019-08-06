@@ -7,7 +7,7 @@ SAIGEgds: Scalable Implementation of Generalized mixed models using GDS files
 
 ## Features
 
-Scalable and accurate implementation of generalized mixed mode with the support of Genomic Data Structure ([GDS](https://github.com/zhengxwen/SeqArray)) files and highly optimized C++ implementation. It is designed for single variant tests in large-scale phenome-wide association studies (PheWAS) with millions of variants and hundreds of thousands of samples, e.g., [UK Biobank genotype data](https://www.ukbiobank.ac.uk).
+Scalable and accurate implementation of generalized mixed mode with the support of Genomic Data Structure ([GDS](https://github.com/zhengxwen/SeqArray)) files and highly optimized C++ implementation. It is designed for single variant tests in large-scale phenome-wide association studies (PheWAS) with millions of variants and hundreds of thousands of samples, e.g., [UK Biobank genotype data](https://www.ukbiobank.ac.uk/scientists-3/genetic-data).
 
 The implementation of SAIGEgds is based on the original [SAIGE](https://github.com/weizhouUMICH/SAIGE) R package (v0.29.4.4). It is implemented with optimized C++ codes taking advantage of sparse structure of genotypes. All of the calculation with single-precision floating-point numbers in [SAIGE](https://github.com/weizhouUMICH/SAIGE) are replaced by the double-precision calculation in SAIGEgds. SAIGEgds also implements some of the [SPAtest](https://cran.r-project.org/web/packages/SPAtest/index.html) functions in C to speed up the calculation of Saddlepoint Approximation.
 
@@ -21,7 +21,9 @@ Dr. [Xiuwen Zheng](xiuwen.zheng@abbvie.com)
 
 ## Installation
 
-* Requires R (≥ v3.5.0), [SeqArray](http://www.bioconductor.org/packages/SeqArray) (≥ v1.24.1)
+* Requires R (≥ v3.5.0), [gdsfmt](http://www.bioconductor.org/packages/gdsfmt) (≥ v1.20.0), [SeqArray](http://www.bioconductor.org/packages/SeqArray) (≥ v1.24.1)
+
+* Recommend [GNU GCC (≥ v6.0)](https://gcc.gnu.org)
 
 * Bioconductor repository (available soon)
 ```R
@@ -37,9 +39,17 @@ install_github("AbbVie-ComputationalGenomics/SAIGEgds")
 ```
 The `install_github()` approach requires that you build from source, i.e. `make` and compilers must be installed on your system -- see the [R FAQ](http://cran.r-project.org/faqs.html) for your operating system; you may also need to install dependencies manually.
 
+* Package rebuilding and unit testing
+```sh
+git clone https://github.com/AbbVie-ComputationalGenomics/SAIGEgds
+R CMD build SAIGEgds
+R CMD check SAIGEgds_0.9.9.tar.gz
+R CMD INSTALL SAIGEgds_0.9.9.tar.gz
+```
+
 * Package vignette
 
-If the package is installed from Bioconductor repository, users can start R and enter to view documentation:
+If the package is installed from Bioconductor repository or package rebuilding, users can start R and enter to view documentation:
 ```R
 browseVignettes("SAIGEgds")
 ```
@@ -51,7 +61,7 @@ browseVignettes("SAIGEgds")
 library(SeqArray)
 library(SAIGEgds)
 
-# open the GDS file for genetic relationship matrix
+# open the GDS file for genetic relationship matrix (GRM)
 grm_fn <- system.file("extdata/grm1k_10k_snp.gds", package="SAIGEgds")
 (grm_gds <- seqOpen(grm_fn))
 
@@ -69,7 +79,7 @@ head(pheno)
 glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_gds, num.thread=2)
 ## SAIGE association analysis:
 ## Filtering variants:
-## [==================================================] 100%, completed (0s)
+## [==================================================] 100%, completed, 0s
 ## Fit the null model: y ~ x1 + x2 + var(GRM)
 ##     # of samples: 1,000
 ##     # of variants: 9,976
@@ -113,7 +123,7 @@ seqClose(geno_gds)
 
 ## Citations
 
-Zheng X, Davis J.Wade, SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models; (Abstract 1920276). Presented at the 69th Annual Meeting of The American Society of Human Genetics (ASHG), Oct 15-19, Houston, US.
+Zheng X, Davis J.Wade, SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models; (Abstract 1920276). *The Annual Meeting of The American Society of Human Genetics (ASHG)*, Oct 15-19, 2019, Houston, US.
 
 Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S. Efficiently controlling for case-control imbalance and sample relatedness in large-scale genetic association studies. *Nat Genet* (2018). Sep;50(9):1335-1341. [DOI: 10.1038/s41588-018-0184-y](https://www.nature.com/articles/s41588-018-0184-y).
 
