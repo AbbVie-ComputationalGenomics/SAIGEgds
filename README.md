@@ -49,11 +49,19 @@ R CMD INSTALL SAIGEgds_0.9.9.tar.gz
 
 * Singularity container
 
-Build the container: `singularity build R-3.6.1_SAIGEgds.simg R-3.6.1_SAIGEgds.recipe`
+Build the container 
+```sh
+singularity build R-3.6.1_SAIGEgds.simg R-3.6.1_SAIGEgds.recipe
+```
+Then either process a batch .R file with Rscript:
+```sh
+singularity run --app Rscript R-3.6.1_SAIGEgds.simg <options> <script.R>
+```
 
-Run Rscript: `singularity run --app Rscript R-3.6.1_SAIGEgds.simg <options> <script.R>`
-
-Start an R session:  `singularity run --app R R-3.6.1_SAIGEgds.simg`
+Or start an R session:
+```sh
+singularity run --app R R-3.6.1_SAIGEgds.simg
+```
 
 
 * Package vignette
