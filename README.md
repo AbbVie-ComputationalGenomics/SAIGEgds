@@ -47,6 +47,13 @@ R CMD check SAIGEgds_0.9.9.tar.gz
 R CMD INSTALL SAIGEgds_0.9.9.tar.gz
 ```
 
+* Singularity container
+
+Build the container: `singularity build R-3.6.1_SAIGEgds.simg R-3.6.1_SAIGEgds.recipe`
+Run Rscript: `singularity run --app Rscript R-3.6.1_SAIGEgds.simg <options> <script.R>`
+Start an R session:  `singularity run --app R R-3.6.1_SAIGEgds.simg`
+
+
 * Package vignette
 
 If the package is installed from Bioconductor repository or package rebuilding, users can start R and enter to view documentation:
