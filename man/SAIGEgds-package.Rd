@@ -47,9 +47,10 @@ gdsfile <- seqOpen(fn)
 # load phenotype
 phenofn <- system.file("extdata/pheno.txt.gz", package="SAIGEgds")
 pheno <- read.table(phenofn, head=TRUE, as.is=TRUE)
+head(pheno)
 
 # fit the null model
-glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, gdsfile)
+glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, gdsfile, trait.type="binary")
 
 # p-value calculation
 assoc <- seqAssocGLMM_SPA(gdsfile, glmm, mac=10)

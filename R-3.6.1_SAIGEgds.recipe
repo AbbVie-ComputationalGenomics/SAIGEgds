@@ -9,24 +9,22 @@ From: r-base:3.6.1
 %files
 
 %post
-	# system requirements
-	apt-get update
-	apt-get -y install file git gcc curl libcurl4-openssl-dev libxml2-dev libssl-dev
+    # system requirements
+    apt-get update
+    apt-get -y install file git gcc curl libcurl4-openssl-dev libxml2-dev libssl-dev
     
     # Install R dependencies and SAIGEgds
-    Rscript -e "install.packages('BiocManager'); BiocManager::install(c('openssl', 'httr', 'gh', 'gdsfmt', 'SeqArray', 'knitr', 'rmarkdown', 'RcppParallel', 'SPAtest', 'RcppArmadillo', 'SNPRelate', 'crayon', 'RUnit'))"
-	git clone https://github.com/AbbVie-ComputationalGenomics/SAIGEgds
-	R CMD build SAIGEgds
-	R CMD check --no-manual SAIGEgds_0.9.9.tar.gz
-	R CMD INSTALL SAIGEgds_0.9.9.tar.gz
+    Rscript -e "install.packages('BiocManager'); BiocManager::install(c('openssl', 'httr', 'gh', 'knitr', 'rmarkdown', 'Rcpp', 'RcppParallel', 'RcppArmadillo', 'gdsfmt', 'SeqArray', 'SNPRelate', 'SPAtest', 'crayon', 'RUnit'))"
+    git clone https://github.com/AbbVie-ComputationalGenomics/SAIGEgds
+    R CMD build SAIGEgds
+    R CMD check --no-manual SAIGEgds_0.9.10.tar.gz
+    R CMD INSTALL SAIGEgds_0.9.10.tar.gz
 
 %apprun R
     exec R "$@"
 %apprun Rscript
-	exec Rscript "$@"
+    exec Rscript "$@"
 %apphelp R
     Run R v3.6.1 in container with SAIGEgds installed
 %apphelp Rscript
     Run Rscript v3.6.1 in container with SAIGEgds installed
-
-

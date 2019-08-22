@@ -15,7 +15,7 @@ exportPattern("^seq*")
 import(methods)
 import(Rcpp)
 importFrom(stats, as.formula, binomial, gaussian, glm, lm, model.frame, model.matrix,
-    model.response, na.omit, sd, var)
+    model.response, na.omit, sd, var, qnorm)
 importFrom(utils, object.size, packageVersion)
 importFrom(gdsfmt, createfn.gds, openfn.gds, closefn.gds, index.gdsn, ls.gdsn,
     add.gdsn, read.gdsn, readex.gdsn, readmode.gdsn, put.attr.gdsn, get.attr.gdsn)

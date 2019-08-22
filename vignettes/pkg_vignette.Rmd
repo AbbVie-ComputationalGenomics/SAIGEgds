@@ -112,7 +112,7 @@ pheno <- data.frame(
     stringsAsFactors = FALSE)
 
 # model fitting
-glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_fn)
+glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_fn, trait.type="binary")
 ```
 
 .

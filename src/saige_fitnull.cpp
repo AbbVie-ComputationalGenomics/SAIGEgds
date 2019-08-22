@@ -648,8 +648,8 @@ static void get_trace_q(const dmat &Sigma_iX, const dmat& X, const dvec& w,
 		}
 	}
 
-	outTrace0 = mean(buf);
-	outTrace1 = mean(buf0);
+	outTrace0 = mean(buf0);
+	outTrace1 = mean(buf);
 }
 
 
@@ -669,9 +669,9 @@ static void get_coefficients(const dvec &Y, const dmat &X, const dvec &w,
 		xv_i = X.col(i);
 		Sigma_iX.col(i) = get_PCG_diag_sigma(w, tau, xv_i, maxiterPCG, tolPCG);
 	}
-	cov = inv_sympd(X.t() * Sigma_iX);
+	cov = inv_sympd(symmatu(X.t() * Sigma_iX));
 	alpha = cov * (Sigma_iX.t() * Y);
-	eta = Y - tau(0) * (Sigma_iY - Sigma_iX * alpha) / w;
+	eta = Y - tau[0] * (Sigma_iY - Sigma_iX * alpha) / w;
 }
 
 
@@ -756,17 +756,21 @@ static void get_AI_score_q(const dvec &Y, const dmat &X, const dvec &w,
 	dvec A0PY = PY;
 	dvec APY;
 	get_crossprod_b_grm(PY, APY);
-	// output
+	// get YPAPY
 	outYPAPY[0] = dot(PY, APY);   // YPAPY
 	outYPAPY[1] = dot(PY, A0PY);  // YPA0PY
+	// get Trace
 	get_trace_q(Sigma_iX, X, w, tau, cov, nrun, maxiterPCG, tolPCG,
 		traceCVcutoff, seed, outTrace[0], outTrace[1]);
+	// get AI
+	dmat AI(2,2);
+	dvec PA0PY_1 = get_PCG_diag_sigma(w, tau, A0PY, maxiterPCG, tolPCG);
+	dvec PA0PY = PA0PY_1 - Sigma_iX * (cov * (Sigma_iXt * PA0PY_1));
+	AI(0,0) = dot(A0PY, PA0PY);
 	dvec PAPY_1 = get_PCG_diag_sigma(w, tau, APY, maxiterPCG, tolPCG);
 	dvec PAPY = PAPY_1 - Sigma_iX * (cov * (Sigma_iXt * PAPY_1));
-	dmat AI(2,2);
 	AI(1,1) = dot(APY, PAPY);
-	AI(0,1) = dot(A0PY, PAPY);
-	AI(1,0) = AI(0,1);
+	AI(1,0) = AI(0,1) = dot(A0PY, PAPY);
 	outAI = AI;
 }
 
@@ -938,7 +942,7 @@ BEGIN_RCPP
 		if (max(tau) > tol_inv_2)
 		{
 			throw std::overflow_error(
-				"Large variance estimate observed in the iterations, model not converged ...");
+				"Large variance estimate observed in the iterations, model not converged!");
 			iter = maxiter + 1;
 			break;
 		}
@@ -1017,6 +1021,13 @@ BEGIN_RCPP
 		tolPCG, verbose,
 		re_Y, re_mu, re_alpha, re_eta, re_W, re_cov, re_Sigma_iY, re_Sigma_iX);
 
+	if (verbose)
+	{
+		Rprintf(
+			"Initial variance component estimates, tau:\n    Sigma_E: %g, Sigma_G: %g\n",
+			tau[0], tau[1]);
+	}
+
 	double YPAPY[2], Trace[2];
 	dmat AI;
 	get_AI_score_q(re_Y, X, re_W, tau, re_Sigma_iY, re_Sigma_iX, re_cov, nrun,
@@ -1025,12 +1036,6 @@ BEGIN_RCPP
 
 	tau[0] = std::max(0.0, tau0[0] + tau0[0]*tau0[0]*(YPAPY[1] - Trace[0])/n);
 	tau[1] = std::max(0.0, tau0[1] + tau0[1]*tau0[1]*(YPAPY[0] - Trace[1])/n);
-	if (verbose)
-	{
-		Rprintf(
-			"Initial variance component estimates, tau:\n    Sigma_E: %g, Sigma_G: %g\n",
-			tau[0], tau[1]);
-	}
 
 	int iter = 1;
 	for (; iter <= maxiter; iter++)
@@ -1055,12 +1060,16 @@ BEGIN_RCPP
 		cov = re_cov; alpha = re_alpha; eta = re_eta;
 		Y = re_Y; mu = re_mu;
 
-		if (tau[1] == 0) break;
+		if (tau[0] <= 0)
+		{
+			print_vec("    tau: ", tau);
+			throw std::overflow_error("Sigma_E = 0, model not converged!");
+		}
 		if (max(abs(tau-tau0) / (abs(tau)+abs(tau0)+tol)) < tol) break;
 		if (max(tau) > tol_inv_2)
 		{
 			throw std::overflow_error(
-				"Large variance estimate observed in the iterations, model not converged ...");
+				"Large variance estimate observed in the iterations, model not converged!");
 			iter = maxiter + 1;
 			break;
 		}
@@ -1160,7 +1169,7 @@ BEGIN_RCPP
 			dvec G = G0 - noK_XXVX_inv * (noK_XV * G0);
 			dvec g = G / sqrt(AC);
 			dvec Sigma_iG = get_PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
-			dvec adj = Sigma_iX * inv_sympd(X1.t() * Sigma_iX) * X1.t() * Sigma_iG;
+			dvec adj = Sigma_iX * inv_sympd(symmatu(X1.t() * Sigma_iX)) * X1.t() * Sigma_iG;
 
 			double var1 = (sum(G % Sigma_iG) - sum(G % adj)) / AC;
 			double var2 = sum(mu % (1-mu) % g % g);
@@ -1268,7 +1277,7 @@ BEGIN_RCPP
 			dvec G = G0 - noK_XXVX_inv * (noK_XV * G0);
 			dvec g = G / sqrt(AC);
 			dvec Sigma_iG = get_PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
-			dvec adj = Sigma_iX * inv_sympd(X1.t() * Sigma_iX) * X1.t() * Sigma_iG;
+			dvec adj = Sigma_iX * inv_sympd(symmatu(X1.t() * Sigma_iX)) * X1.t() * Sigma_iG;
 
 			double var1 = (sum(G % Sigma_iG) - sum(G % adj)) / AC;
 			double var2 = sum(g % g);

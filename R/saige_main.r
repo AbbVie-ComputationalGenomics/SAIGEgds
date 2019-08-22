@@ -57,6 +57,8 @@ SIMD <- function() .Call(saige_simd_version)
     s
 }
 
+.rank_norm <- function(x) qnorm((rank(x) - 0.5)/length(x))
+
 
 # Internal model checking
 .check_saige_model <- function(obj)
@@ -369,10 +371,13 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
             else
                 y <- data[[phenovar]]
             v <- table(y)
+            n <- length(v) 
             v <- data.frame(v, as.numeric(prop.table(v)))
             v[, 1L] <- paste0("      ", v[, 1L])
             colnames(v) <- c(phenovar, "Number", "Proportion")
             print(v, row.names=FALSE)
+            if (n != 2L)
+                stop("The outcome variable has more than 2 categories!")
         }
 
         # fit the null model
@@ -428,7 +433,20 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
             print(v)
         }
 
-        stop("Quantitative implementation is not ready!")
+        # Inverse normal transformation
+        if (isTRUE(inv.norm))
+        {
+            if (isTRUE(X.transform)) phenovar <- "y"
+            fit0 <- glm(formula, data=data)
+            resid.sd <- sd(fit0$residuals)
+            new.y <- .rank_norm(fit0$residuals) * resid.sd
+            data[[phenovar]] <- new.y
+            if (verbose)
+            {
+                cat("Inverse normal transformation on residuals with standard deviation: ",
+                    resid.sd, "\n", sep="")
+            }
+        }
 
         # fit the null model
         fit0 <- glm(formula, data=data)
@@ -446,26 +464,24 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
         obj.noK$y <- fit0$y
         obj.noK$mu <- fit0$fitted.values
         obj.noK$res <- fit0$y - obj.noK$mu
-        obj.noK$V <- 1
+        obj.noK$V <- rep(1, length(fit0$y))
         obj.noK$X1 <- X1
         obj.noK$XV <- t(X1)
-        obj.noK$XVX_inv <- solve(t(X1) %*% X1)
-        obj.noK$XXVX_inv <- X1 %*% obj.noK$XVX_inv
+        obj.noK$XXVX_inv <- X1 %*% solve(t(X1) %*% X1)
         class(obj.noK) <- "SA_NULL"
 
         # initial tau
         tau <- tau.init
-        if (sum(tau) == 0)
-        {
-            y <- fit0$y
-            offset <- fit0$offset
-            if (is.null(offset)) offset <- rep(0, length(y))
-            eta <- fit0$linear.predictors
-            mu <- fit0$fitted.values
-            mu.eta <- fit0$family$mu.eta(eta)
-            Y <- eta - offset + (y - mu)/mu.eta
-            tau[] <- var(Y)/2
-        }
+        if (sum(tau) == 0) tau <- c(0.5, 0.5)
+
+        y <- fit0$y
+        offset <- fit0$offset
+        if (is.null(offset)) offset <- rep(0, length(y))
+        eta <- fit0$linear.predictors
+        mu <- fit0$fitted.values
+        mu.eta <- fit0$family$mu.eta(eta)
+        Y <- eta - offset + (y - mu)/mu.eta
+        tau <- var(Y) * tau / sum(tau)
 
         # iterate
         glmm <- .Call(saige_fit_AI_PCG_quant, fit0, X1, tau, param)
@@ -623,7 +639,7 @@ seqAssocGLMM_SPA <- function(gdsfile, modobj, maf=NaN, mac=10,
         maf = maf, mac = mac, spa.pval = spa.pval,
         tau = modobj$tau,
         y = y[ii], mu = mu[ii],
-        y_mu = y[ii] - mu[ii],  # y - mu
+        y_mu = (y - mu)[ii],  # y - mu
         mu2 = (mu * (1 - mu))[ii],
         t_XXVX_inv = t(modobj$obj.noK$XXVX_inv[ii, ]),  # K x n_samp (K << n_samp, more efficient)
         XV = modobj$obj.noK$XV[, ii],  # K x n_samp
@@ -640,8 +656,17 @@ seqAssocGLMM_SPA <- function(gdsfile, modobj, maf=NaN, mac=10,
         buf_spa = double(n+n),
         buf_tmp = double(ncol(X1))
     )
-    mobj$XVX <- t(X1) %*% (X1 * mobj$mu2)  # a matrix: K x K
-    mobj$S_a <- colSums(X1 * mobj$y_mu)    # a vector of size K
+    if (modobj$trait.type == "binary")
+    {
+        mobj$XVX <- t(X1) %*% (X1 * mobj$mu2)  # a matrix: K x K
+        mobj$S_a <- colSums(X1 * mobj$y_mu)    # a vector of size K
+    } else if (modobj$trait.type == "quantitative")
+    {
+        mobj$XVX <- t(X1) %*% X1               # a matrix: K x K
+        mobj$S_a <- colSums(X1 * mobj$y_mu)    # a vector of size K
+    } else {
+        stop("Invalid 'modobj$trait.type'.")
+    }
 
     if (!is.finite(mobj$var.ratio))
         stop("Invalid variance ratio in the SAIGE model.")
@@ -687,16 +712,16 @@ seqAssocGLMM_SPA <- function(gdsfile, modobj, maf=NaN, mac=10,
                 seqApply(f, dsnode, .cfunction("saige_score_test_bin"), as.is="list",
                     parallel=FALSE, .progress=pverbose, .list_dup=FALSE, .useraw=NA)
             }, dsnode=dsnode, pverbose=verbose & (njobs==1L))
-    } else if (modobj$trait.type == "quantitative")    
+    } else if (modobj$trait.type == "quantitative")
     {
-        stop("Quantitative implementation is not ready.")
-
         rv <- seqParallel(parallel, gdsfile, split="by.variant",
-            FUN = function(f, dsnode, verbose)
+            .initialize=initfun, .finalize=finalfun, .initparam=mobj,
+            .balancing=TRUE, .bl_size=50000L, .bl_progress=verbose,
+            FUN = function(f, dsnode, pverbose)
             {
                 seqApply(f, dsnode, .cfunction("saige_score_test_quant"), as.is="list",
-                    parallel=FALSE, .progress=verbose, .list_dup=FALSE, .useraw=NA)
-            }, dsnode=dsnode, verbose=verbose)
+                    parallel=FALSE, .progress=pverbose, .list_dup=FALSE, .useraw=NA)
+            }, dsnode=dsnode, pverbose=verbose & (njobs==1L))
     } else {
         stop("Invalid 'modobj$trait.type'.")
     }

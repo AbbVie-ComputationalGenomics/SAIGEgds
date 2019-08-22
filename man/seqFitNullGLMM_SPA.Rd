@@ -20,13 +20,13 @@ seqFitNullGLMM_SPA(formula, data, gdsfile, trait.type=c("binary", "quantitative"
     \item{data}{a data frame for the formulas}
     \item{gdsfile}{a SeqArray GDS filename, or a GDS object}
     \item{trait.type}{"binary" for binary outcomes, "quantitative" for continuous
-        outcomes (not applicable)}
+        outcomes}
     \item{sample.col}{the column name of sample IDs corresponding to the GDS file}
     \item{maf}{minor allele frequency for imported genotypes, if \code{variant.id=NULL}}
     \item{missing.rate}{threshold of missing rate, if \code{variant.id=NULL}}
     \item{max.num.snp}{the maximum number of SNPs used, or -1 for no limit}
     \item{variant.id}{a list of variant IDs, used to construct GRM}
-    \item{inv.norm}{perform inverse normal transform or not}
+    \item{inv.norm}{perform inverse normal transformation on residuals or not}
     \item{X.transform}{if TRUE, perform QR decomposition on the design matrix}
     \item{tol}{overall tolerance for model fitting}
     \item{maxiter}{the maximum number of iterations for model fitting}
@@ -101,9 +101,10 @@ gdsfile <- seqOpen(fn)
 # load phenotype
 phenofn <- system.file("extdata/pheno.txt.gz", package="SAIGEgds")
 pheno <- read.table(phenofn, head=TRUE, as.is=TRUE)
+head(pheno)
 
 # fit the null model
-glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, gdsfile)
+glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, gdsfile, trait.type="binary")
 
 
 # close the GDS file
