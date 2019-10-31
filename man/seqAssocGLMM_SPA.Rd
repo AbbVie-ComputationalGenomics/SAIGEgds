@@ -2,7 +2,8 @@
 \alias{seqAssocGLMM_SPA}
 \title{P-value calculation}
 \description{
-    P-value calculations using variance approximation and SPA adjustment.
+    P-value calculations using variance approximation and an adjustment of Saddlepoint
+approximation.
 }
 
 \usage{
@@ -33,9 +34,10 @@ seqAssocGLMM_SPA(gdsfile, modobj, maf=NaN, mac=10, dsnode="", spa.pval=0.05,
 
 \details{
     The original SAIGE R package uses 0.05 as a threshold for unadjusted p-values to
-further calculate SPA-adjusted p-values. if \code{var.ratio=NaN}, the average of variance
+further calculate SPA-adjusted p-values. If \code{var.ratio=NaN}, the average of variance
 ratios (\code{mean(modobj$var.ratio$ratio)}) is used instead.
-    For more details of SAIGE algorithm, please refer to the SAIGE paper.
+    For more details of SAIGE algorithm, please refer to the SAIGE paper
+[Zhou et al. 2018] (see the reference section).
 }
 
 \value{
@@ -72,12 +74,12 @@ ratios (\code{mean(modobj$var.ratio$ratio)}) is used instead.
 
 \examples{
 # open a GDS file
-fn <- system.file("extdata/grm1k_10k_snp.gds", package="SAIGEgds")
+fn <- system.file("extdata", "grm1k_10k_snp.gds", package="SAIGEgds")
 gdsfile <- seqOpen(fn)
 
 # load phenotype
-phenofn <- system.file("extdata/pheno.txt.gz", package="SAIGEgds")
-pheno <- read.table(phenofn, head=TRUE, as.is=TRUE)
+phenofn <- system.file("extdata", "pheno.txt.gz", package="SAIGEgds")
+pheno <- read.table(phenofn, header=TRUE, as.is=TRUE)
 head(pheno)
 
 # fit the null model

@@ -1,5 +1,34 @@
 citHeader("To cite SAIGEgds in publications use:")
 
+citEntry(entry="Misc",
+    title = "SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models",
+    author = personList(person("Xiuwen", "Zheng"), person("J. Wade", "Davis")),
+    journal = "American Society of Human Genetics Annual Meeting",
+    year = "2019",
+    textVersion =
+        paste("Zheng X, Davis J.Wade.",
+            "SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models.",
+            "The Annual Meeting of The American Society of Human Genetics (ASHG), Oct 15-19, 2019, Houston, US")
+)
+
+citEntry(entry="Article",
+    title = "Efficiently controlling for case-control imbalance and sample relatedness in large-scale genetic association studies",
+    author = personList(person("Wei", "Zhou"), person("Jonas B.", "Nielsen"),
+        person("Lars G.", "Fritsche"), person("Rounak", "Dey"), person("Maiken E.", "Gabrielsen"),
+        person("Brooke N.", "Wolford"), person("Jonathon", "LeFaive"), person("Peter", "VandeHaar"),
+        person("Sarah A.", "Gagliano"), person("Aliya", "Gifford"), person("Lisa A.", "Bastarache"),
+        person("Wei-Qi", "Wei"), person("Joshua C.", "Denny"), person("Maoxuan", "Lin"),
+        person("Kristian", "Hveem"), person("Hyun Min", "Kang"), person("Goncalo R.", "Abecasis"),
+        person("Cristen J.", "Willer"), person("Seunggeun", "Lee")),
+    journal = "Nature Genetics",
+    year = "2018",
+    doi = "10.1038/s41588-018-0184-y",
+    textVersion =
+        paste("Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S.",
+            "Efficiently controlling for case-control imbalance and sample relatedness in large-scale genetic association studies.",
+            "Nature Genetics 2018. Sep;50(9):1335-1341. doi: 10.1038/s41588-018-0184-y")
+)
+
 citEntry(entry="Article",
     title = "SeqArray -- A storage-efficient high-performance data format for WGS variant calls",
     author = personList(person("Xiuwen", "Zheng"), person("Stephanie", "Gogarten"),
@@ -8,7 +37,6 @@ citEntry(entry="Article",
     journal = "Bioinformatics",
     year = "2017",
     doi = "10.1093/bioinformatics/btx145",
-
     textVersion =
         paste("Xiuwen Zheng, Stephanie M. Gogarten, Michael Lawrence, Adrienne Stilp, Matthew P. Conomos, Bruce S. Weir, Cathy Laurie, David Levine.",
             "SeqArray -- A storage-efficient high-performance data format for WGS variant calls.",

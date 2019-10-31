@@ -1,21 +1,21 @@
 ---
-title: "Generalized Mixed Models in GWAS using SAIGEgds"
+title: "Generalized Mixed Models in PheWAS using SAIGEgds"
 author: "Xiuwen Zheng (Genomics Research Center, AbbVie, North Chicago)"
-date: "Aug, 2019"
+date: "Oct, 2019"
 output:
-  html_document:
-    theme: spacelab
-    toc: true
-    number_sections: true
-  pdf_document:
-    toc: true
-    toc_depth: 3
+    html_document:
+        theme: spacelab
+        toc: true
+        number_sections: true
+    pdf_document:
+        toc: true
+        toc_depth: 3
 vignette: >
-  %\VignetteIndexEntry{SAIGEgds Tutorial}
-  %\VignetteDepends{SAIGEgds}
-  %\VignetteKeywords{GWAS, PheWAS, mixed models}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+    %\VignetteIndexEntry{SAIGEgds Tutorial}
+    %\VignetteDepends{SAIGEgds}
+    %\VignetteKeywords{GWAS, PheWAS, mixed models}
+    %\VignetteEngine{knitr::rmarkdown}
+    %\VignetteEncoding{UTF-8}
 ---
 
 .
@@ -26,9 +26,9 @@ vignette: >
 options(width=110)
 ```
 
-Phenome-wide association study (PheWAS) is known to be a powerful tool in discovery and replication of genetic association studies. The recent development in the UK Biobank resource with deep genomic and phenotyping data has provided unparalleled research opportunities. To reduce the computational complexity and cost of PheWAS, the SAIGE (scalable and accurate implementation of generalized mixed model [1]) method was proposed recently. However, it is still computationally challenging to analyze the associations of thousands of phenotypes with whole-genome variant data, especially for disease diagnoses using the ICD-10 codes of deep phenotyping.
+Phenome-wide association study (PheWAS) is known to be a powerful tool in discovery and replication of genetic association studies. The recent development in the UK Biobank resource with deep genomic and phenotyping data has provided unparalleled research opportunities. To reduce the computational complexity and cost of PheWAS, the SAIGE (scalable and accurate implementation of generalized mixed model [1]) method was proposed recently, controlling for case-control imbalance and sample structure in single variant association studies. However, it is still computationally challenging to analyze the associations of thousands of phenotypes with whole-genome variant data, especially for disease diagnoses using the ICD-10 codes of deep phenotyping.
 
-Here we develop a new high-performance statistical package (SAIGEgds) for large-scale PheWAS using mixed models [2]. In this package, the SAIGE method is implemented with optimized C++ codes taking advantage of sparse structure of genotype dosages. SAIGEgds supports efficient genomic data structure (GDS) files [3] including both integer genotypes and numeric dosages. Benchmarks using the UKBiobank White British genotype data (N=430K) with coronary heart disease and simulated cases, show that SAIGEgds is 5 to 6 times faster than the SAIGE R package in the steps of fitting null models and p-value calculations. When used in conjunction with high-performance computing (HPC) clusters and/or cloud resources, SAIGEgds provides an efficient analysis pipeline for biobank-scale PheWAS.
+Here we develop a new high-performance statistical package (SAIGEgds) for large-scale PheWAS using mixed models [2]. In this package, the SAIGE method is implemented with optimized C++ codes taking advantage of sparse structure of genotype dosages. SAIGEgds supports efficient genomic data structure (GDS) files [3] including both integer genotypes and numeric imputed dosages. Benchmarks using the UK Biobank White British genotype data (N=430K) with coronary heart disease and simulated cases, show that SAIGEgds is 5 to 6 times faster than the SAIGE R package in the steps of fitting null models and p-value calculations. When used in conjunction with high-performance computing (HPC) clusters and/or cloud resources, SAIGEgds provides an efficient analysis pipeline for biobank-scale PheWAS.
 
 .
 
@@ -40,13 +40,7 @@ if (!requireNamespace("BiocManager", quietly=TRUE))
     install.packages("BiocManager")
 BiocManager::install("SAIGEgds")
 ```
-
-* Development version from Github:
-```R
-library("devtools")
-install_github("AbbVie-ComputationalGenomics/SAIGEgds")
-```
-The `install_github()` approach requires that you build from source, i.e. `make` and compilers must be installed on your system -- see the [R FAQ](http://cran.r-project.org/faqs.html) for your operating system; you may also need to install dependencies manually.
+The `BiocManager::install()` approach may require that you build from source, i.e. `make` and compilers must be installed on your system -- see the [R FAQ](http://cran.r-project.org/faqs.html) for your operating system; you may also need to install dependencies manually.
 
 .
 
@@ -110,9 +104,10 @@ pheno <- data.frame(
     x1 = rnorm(length(sampid)),
     x2 = rnorm(length(sampid)),
     stringsAsFactors = FALSE)
+head(pheno)
 
 # model fitting
-glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_fn, trait.type="binary")
+glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_fn, trait.type="binary", sample.col="sample.id")
 ```
 
 .
@@ -133,7 +128,7 @@ assoc[assoc$pval < 5e-4, ]
 
 ## QQ plot for p-values
 
-```{r fig.width=5, fig.height=5, fig.align='center'}
+```{r fig.width=4.5, fig.height=4.5, fig.align='center'}
 n <- nrow(assoc)
 # expected p-values
 exp.pval <- (1:n) / n
@@ -164,13 +159,12 @@ unlink("grm_geno.gds", force=TRUE)
 
 # References
 
-1. Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S. Efficiently controlling for case-control imbalance and sample relatedness in large-scale genetic association studies. *Nat Genet* (2018). Sep;50(9):1335-1341.
-
+1. Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S. Efficiently controlling for case-control imbalance and sample relatedness in large-scale genetic association studies. *Nat Genet* (2018). Sep;50(9):1335-1341. [DOI: 10.1038/s41588-018-0184-y](https://doi.org/10.1038/s41588-018-0184-y)
 2. Zheng X, Davis J.Wade, SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models; (Abstract 1920276). *The Annual Meeting of The American Society of Human Genetics (ASHG)*, Oct 15-19, 2019, Houston, US.
-
 3. Zheng X, Gogarten S, Lawrence M, Stilp A, Conomos M, Weir BS, Laurie C, Levine D. SeqArray -- A storage-efficient high-performance data format for WGS variant calls. *Bioinformatics* (2017). [DOI: 10.1093/bioinformatics/btx145](http://dx.doi.org/10.1093/bioinformatics/btx145).
 
 .
+
 
 # Also See
 

@@ -6,7 +6,7 @@
 CXX_STD = CXX11
 
 # additional preprocessor options
-PKG_CXXFLAGS = $(PKG_CXXFLAGS) -DRCPP_PARALLEL_USE_TBB=1
+PKG_CXXFLAGS += -DRCPP_PARALLEL_USE_TBB=1
 
 # to set flags for the linker
 PKG_LIBS = -lm $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) \

@@ -11,12 +11,12 @@ seqFitNullGLMM_SPA(formula, data, gdsfile, trait.type=c("binary", "quantitative"
     variant.id=NULL, inv.norm=TRUE, X.transform=TRUE, tol=0.02, maxiter=20L,
     nrun=30L, tolPCG=1e-5, maxiterPCG=500L, num.marker=30L, tau.init=c(0,0),
     traceCVcutoff=0.0025, ratioCVcutoff=0.001, geno.sparse=TRUE, num.thread=1L,
-    model.savefn="", seed=200L, no.fork.loading=FALSE, verbose=TRUE)
+    model.savefn="", seed=200L, fork.loading=FALSE, verbose=TRUE)
 }
 
 \arguments{
     \item{formula}{an object of class \code{formula} (or one that can be coerced to
-          that class), e.g., \code{y ~ x1 + x2}, see \code{\link{lm}}}
+        that class), e.g., \code{y ~ x1 + x2}, see \code{\link{lm}}}
     \item{data}{a data frame for the formulas}
     \item{gdsfile}{a SeqArray GDS filename, or a GDS object}
     \item{trait.type}{"binary" for binary outcomes, "quantitative" for continuous
@@ -26,8 +26,9 @@ seqFitNullGLMM_SPA(formula, data, gdsfile, trait.type=c("binary", "quantitative"
     \item{missing.rate}{threshold of missing rate, if \code{variant.id=NULL}}
     \item{max.num.snp}{the maximum number of SNPs used, or -1 for no limit}
     \item{variant.id}{a list of variant IDs, used to construct GRM}
-    \item{inv.norm}{perform inverse normal transformation on residuals or not}
-    \item{X.transform}{if TRUE, perform QR decomposition on the design matrix}
+    \item{inv.norm}{if \code{TRUE}, perform inverse normal transformation on residuals
+        for quantitative outcomes, see the reference [Sofer, 2019]}
+    \item{X.transform}{if \code{TRUE}, perform QR decomposition on the design matrix}
     \item{tol}{overall tolerance for model fitting}
     \item{maxiter}{the maximum number of iterations for model fitting}
     \item{nrun}{the number of random vectors in the trace estimation}
@@ -49,15 +50,17 @@ seqFitNullGLMM_SPA(formula, data, gdsfile, trait.type=c("binary", "quantitative"
     \item{num.thread}{the number of threads}
     \item{model.savefn}{the filename of model output, R data file '.rda' or '.RData'}
     \item{seed}{an integer as a seed for random numbers}
-    \item{no.fork.loading}{forking processes in Unix can reduce loading time, but may
-        double the memory usage; not applicable on Windows}
+    \item{fork.loading}{load genotypes via forking or not; forking processes in Unix can
+        reduce loading time of genotypes, but may double the memory usage; not applicable
+        on Windows}
     \item{verbose}{if \code{TRUE}, show information}
 }
 
 \details{
     Utilizing the sparse structure of genotypes could significantly improve the
 computational efficiency of model fitting, but it also increases the memory usage.
-    For more details of SAIGE algorithm, please refer to the SAIGE paper.
+    For more details of SAIGE algorithm, please refer to the SAIGE paper
+[Zhou et al. 2018] (see the reference section).
 }
 
 \value{
@@ -82,11 +85,14 @@ computational efficiency of model fitting, but it also increases the memory usag
 
 \references{
     Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J,
-    VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K,
-    Kang HM, Abecasis GR, Willer CJ, Lee S.
-    Efficiently controlling for case-control imbalance and sample relatedness in
-    large-scale genetic association studies.
-    Nat Genet (2018). Sep;50(9):1335-1341.
+VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K,
+Kang HM, Abecasis GR, Willer CJ, Lee S. Efficiently controlling for case-control
+imbalance and sample relatedness in large-scale genetic association studies.
+Nat Genet (2018). Sep;50(9):1335-1341.
+
+    T Sofer, X Zheng, SM Gogarten, CA Laurie, etc. A fully adjusted two-stage procedure
+for rank-normalization in genetic association studies. 2019.
+Genetic Epidemiology 43(3), 263-275
 }
 \author{Xiuwen Zheng}
 \seealso{
@@ -95,12 +101,12 @@ computational efficiency of model fitting, but it also increases the memory usag
 
 \examples{
 # open a GDS file
-fn <- system.file("extdata/grm1k_10k_snp.gds", package="SAIGEgds")
+fn <- system.file("extdata", "grm1k_10k_snp.gds", package="SAIGEgds")
 gdsfile <- seqOpen(fn)
 
 # load phenotype
-phenofn <- system.file("extdata/pheno.txt.gz", package="SAIGEgds")
-pheno <- read.table(phenofn, head=TRUE, as.is=TRUE)
+phenofn <- system.file("extdata", "pheno.txt.gz", package="SAIGEgds")
+pheno <- read.table(phenofn, header=TRUE, as.is=TRUE)
 head(pheno)
 
 # fit the null model

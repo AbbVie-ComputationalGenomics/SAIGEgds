@@ -43,6 +43,8 @@
 
 SIMD <- function() .Call(saige_simd_version)
 
+.rank_norm <- function(x) qnorm((rank(x) - 0.5)/length(x))
+
 .crayon_inverse <- function(s)
 {
     if (requireNamespace("crayon", quietly=TRUE))
@@ -56,8 +58,6 @@ SIMD <- function() .Call(saige_simd_version)
         s <- crayon::underline(s)
     s
 }
-
-.rank_norm <- function(x) qnorm((rank(x) - 0.5)/length(x))
 
 
 # Internal model checking
@@ -149,7 +149,7 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
     missing.rate=0.01, max.num.snp=1000000L, variant.id=NULL, inv.norm=TRUE,
     X.transform=TRUE, tol=0.02, maxiter=20L, nrun=30L, tolPCG=1e-5, maxiterPCG=500L,
     num.marker=30L, tau.init=c(0,0), traceCVcutoff=0.0025, ratioCVcutoff=0.001,
-    geno.sparse=TRUE, num.thread=1L, model.savefn="", seed=200L, no.fork.loading=FALSE,
+    geno.sparse=TRUE, num.thread=1L, model.savefn="", seed=200L, fork.loading=FALSE,
     verbose=TRUE)
 {
     stopifnot(inherits(formula, "formula"))
@@ -175,12 +175,17 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
     stopifnot(is.numeric(num.thread), length(num.thread)==1L)
     stopifnot(is.character(model.savefn), length(model.savefn)==1L)
     stopifnot(is.numeric(seed), length(seed)==1L, is.finite(seed))
-    stopifnot(is.logical(no.fork.loading), length(no.fork.loading)==1L)
+    stopifnot(is.logical(fork.loading), length(fork.loading)==1L)
     stopifnot(is.logical(verbose), length(verbose)==1L)
 
     if (verbose)
+    {
         cat(.crayon_inverse("SAIGE association analysis:\n"))
-    set.seed(seed)
+        cat(.crayon_underline(date()), "\n", sep="")
+    }
+
+    rand_seed <- eval(parse(text="set.seed"))
+    rand_seed(seed)
 
     if (is.character(gdsfile))
     {
@@ -198,6 +203,8 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
     vars <- all.vars(formula)
     phenovar <- all.vars(formula)[1L]
     y <- data[[phenovar]]
+    if (is.null(y))
+        stop("There is no '", phenovar, "' in the input data frame.")
     if (!is.factor(y) && !is.numeric(y) && !is.logical(y))
         stop("The response variable should be numeric or a factor.")
 
@@ -242,7 +249,7 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
     n <- sum(v, na.rm=TRUE)
     if (max.num.snp>0L && n>max.num.snp)
     {
-        set.seed(seed)
+        rand_seed(seed)
         seqSetFilter(gdsfile, variant.sel=sample(which(v), max.num.snp),
             verbose=FALSE)
     }
@@ -307,7 +314,7 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
     if (verbose)
         cat("Start loading SNP genotypes:\n")
     nfork <- 1L
-    if (SeqArray:::.IsForking(num.thread) && !no.fork.loading)
+    if (SeqArray:::.IsForking(num.thread) && isTRUE(fork.loading))
         nfork <- num.thread
     if (isTRUE(geno.sparse))
     {
@@ -406,8 +413,11 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
 
         # calculate the variance ratio
         if (verbose)
-            cat(.crayon_underline("Calculate the average ratio of variances:\n"))
-        set.seed(seed)
+        {
+            cat(.crayon_inverse("Calculate the average ratio of variances:\n"))
+            cat(.crayon_underline(date()), "\n", sep="")
+        }
+        rand_seed(seed)
         var.ratio <- .Call(saige_calc_var_ratio_binary, fit0, glmm, obj.noK,
             param, sample.int(n_var, n_var))
         var.ratio <- var.ratio[order(var.ratio$id), ]
@@ -488,8 +498,11 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
 
         # calculate the variance ratio
         if (verbose)
-            cat(.crayon_underline("Calculate the average ratio of variances:\n"))
-        set.seed(seed)
+        {
+            cat(.crayon_inverse("Calculate the average ratio of variances:\n"))
+            cat(.crayon_underline(date()), "\n", sep="")
+        }
+        rand_seed(seed)
         var.ratio <- .Call(saige_calc_var_ratio_quant, fit0, glmm, obj.noK,
             param, sample.int(n_var, n_var))
         var.ratio <- var.ratio[order(var.ratio$id), ]
@@ -531,7 +544,10 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
         save(.glmm, file=model.savefn)
     }
     if (verbose)
+    {
+        cat(.crayon_underline(date()), "\n", sep="")
         cat(.crayon_inverse("Done."), "\n", sep="")
+    }
 
     if (!is.na(model.savefn) && model.savefn!="")
         return(invisible(glmm))
@@ -674,18 +690,19 @@ seqAssocGLMM_SPA <- function(gdsfile, modobj, maf=NaN, mac=10,
     # is forking or not?
     is_fork <- SeqArray:::.IsForking(parallel)
     njobs <- SeqArray:::.NumParallel(parallel)
-    if (verbose && njobs>1L)
-        cat("    # of processes: ", njobs, "\n", sep="")
+    if (verbose) cat("    # of processes: ", njobs, "\n", sep="")
 
     # initialize internally
     if (njobs<=1L || is_fork)
     {
+        # forking, no need to distribute model parameters
         .Call(saige_score_test_init, mobj)
         initfun <- finalfun <- NULL
     } else {
+        # pass the model parameters to each process
         if (verbose)
             cat("Distribute the model parameters to the", njobs, "processes\n")
-        # pass the model parameters to each process
+        # initialize child processes internally
         initfun <- function(proc_id, mobj)
         {
             eval(parse(text="library(Rcpp)"))

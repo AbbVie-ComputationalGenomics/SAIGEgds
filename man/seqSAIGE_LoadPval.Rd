@@ -2,7 +2,7 @@
 \alias{seqSAIGE_LoadPval}
 \title{Load the association results}
 \description{
-    Load the association results from a RData or GDS file.
+    Load the association results from an RData or GDS file.
 }
 
 \usage{
@@ -11,7 +11,8 @@ seqSAIGE_LoadPval(fn, varnm=NULL, index=NULL, verbose=TRUE)
 
 \arguments{
     \item{fn}{RData or GDS file names, merging datasets if multiple files}
-    \item{varnm}{NULL, or a character vector to include the column names}
+    \item{varnm}{NULL, or a character vector to include the column names; e.g.,
+        \code{c("chr", "position", "rs.id", "ref", "alt", "pval")}}
     \item{index}{NULL, or a logical/numeric vector for a set of rows}
     \item{verbose}{if \code{TRUE}, show information}
 }
@@ -26,7 +27,7 @@ seqSAIGE_LoadPval(fn, varnm=NULL, index=NULL, verbose=TRUE)
 }
 
 \examples{
-(fn <- system.file("unitTests/saige_pval.rda", package="SAIGEgds"))
+(fn <- system.file("unitTests", "saige_pval.rda", package="SAIGEgds"))
 pval <- seqSAIGE_LoadPval(fn)
 
 names(pval)

@@ -16,12 +16,12 @@ library(SAIGEgds)
 		error=function(e) FALSE)
 
 	# open a GDS file
-	fn <- system.file("extdata/grm1k_10k_snp.gds", package="SAIGEgds")
+	fn <- system.file("extdata", "grm1k_10k_snp.gds", package="SAIGEgds")
 	gdsfile <- seqOpen(fn)
 	on.exit(seqClose(gdsfile))
 
 	# load phenotype
-	phenofn <- system.file("extdata/pheno.txt.gz", package="SAIGEgds")
+	phenofn <- system.file("extdata", "pheno.txt.gz", package="SAIGEgds")
 	pheno <- read.table(phenofn, header=TRUE, as.is=TRUE)
 
 	# fit the null model for binary outcomes
@@ -48,16 +48,16 @@ test.saige_fit_null_model <- function()
 		error=function(e) FALSE)
 
 	# load the previous models
-	mod1 <- get(load(system.file("unitTests/saige_model.rda", package="SAIGEgds")))
-	mod2 <- get(load(system.file("unitTests/saige_model_quant.rda", package="SAIGEgds")))
+	mod1 <- get(load(system.file("unitTests", "saige_model.rda", package="SAIGEgds")))
+	mod2 <- get(load(system.file("unitTests", "saige_model_quant.rda", package="SAIGEgds")))
 
 	# open a GDS file
-	fn <- system.file("extdata/grm1k_10k_snp.gds", package="SAIGEgds")
+	fn <- system.file("extdata", "grm1k_10k_snp.gds", package="SAIGEgds")
 	gdsfile <- seqOpen(fn)
 	on.exit(seqClose(gdsfile))
 
 	# load phenotype
-	phenofn <- system.file("extdata/pheno.txt.gz", package="SAIGEgds")
+	phenofn <- system.file("extdata", "pheno.txt.gz", package="SAIGEgds")
 	pheno <- read.table(phenofn, header=TRUE, as.is=TRUE)
 
 	# fit the null model, check binary outcomes
@@ -75,13 +75,13 @@ test.saige_fit_null_model <- function()
 test.saige_pval <- function()
 {
 	# load the previous models and results
-	mod1 <- get(load(system.file("unitTests/saige_model.rda", package="SAIGEgds")))
-	mod2 <- get(load(system.file("unitTests/saige_model_quant.rda", package="SAIGEgds")))
-	pval1 <- get(load(system.file("unitTests/saige_pval.rda", package="SAIGEgds")))
-	pval2 <- get(load(system.file("unitTests/saige_pval_quant.rda", package="SAIGEgds")))
+	mod1 <- get(load(system.file("unitTests", "saige_model.rda", package="SAIGEgds")))
+	mod2 <- get(load(system.file("unitTests", "saige_model_quant.rda", package="SAIGEgds")))
+	pval1 <- get(load(system.file("unitTests", "saige_pval.rda", package="SAIGEgds")))
+	pval2 <- get(load(system.file("unitTests", "saige_pval_quant.rda", package="SAIGEgds")))
 
 	# open a GDS file
-	fn <- system.file("extdata/grm1k_10k_snp.gds", package="SAIGEgds")
+	fn <- system.file("extdata", "grm1k_10k_snp.gds", package="SAIGEgds")
 	gdsfile <- seqOpen(fn)
 	on.exit(seqClose(gdsfile))
 

@@ -2,15 +2,17 @@
 \alias{SAIGEgds-package}
 \alias{SAIGEgds}
 \docType{package}
-\title{Scalable Implementation of Generalized mixed models using GDS files}
+\title{Scalable Implementation of Generalized mixed models in PheWAS using GDS files}
 \description{
     Scalable and accurate implementation of generalized mixed mode with the support
 of Genomic Data Structure (GDS) files and highly optimized C++ implementation. It is
 designed for single variant tests in large-scale phenome-wide association studies
 (PheWAS) with millions of variants and hundreds of thousands of samples, e.g., UK
-Biobank genotype data.
+Biobank genotype data, controlling for case-control imbalance and sample structure
+in single variant association studies.
 
-    The implementation of SAIGEgds is based on the original SAIGE R package (v0.29.4.4).
+    The implementation of SAIGEgds is based on the original SAIGE R package (v0.29.4.4)
+[Zhou et al. 2018] \url{https://github.com/weizhouUMICH/SAIGE/releases/tag/v0.29.4.4}.
 All of the calculation with single-precision floating-point numbers in SAIGE are
 replaced by the double-precision calculation in SAIGEgds. SAIGEgds also implements some
 of the SPAtest functions in C to speed up the calculation of Saddlepoint Approximation.
@@ -41,12 +43,12 @@ SeqArray -- A storage-efficient high-performance data format for WGS variant cal
 
 \examples{
 # open the GDS file
-fn <- system.file("extdata/grm1k_10k_snp.gds", package="SAIGEgds")
+fn <- system.file("extdata", "grm1k_10k_snp.gds", package="SAIGEgds")
 gdsfile <- seqOpen(fn)
 
 # load phenotype
-phenofn <- system.file("extdata/pheno.txt.gz", package="SAIGEgds")
-pheno <- read.table(phenofn, head=TRUE, as.is=TRUE)
+phenofn <- system.file("extdata", "pheno.txt.gz", package="SAIGEgds")
+pheno <- read.table(phenofn, header=TRUE, as.is=TRUE)
 head(pheno)
 
 # fit the null model
