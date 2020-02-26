@@ -1,3 +1,15 @@
+CHANGES IN VERSION 1.0.1
+-------------------------
+
+    o add a new option for the threshold of missing variant to
+      `seqAssocGLMM_SPA()`
+
+    o change the output column 'AC.alt' to 'mac' in `seqAssocGLMM_SPA()`
+
+    o retry model fitting at least 10 times if matrix is singular or not
+      positive definite, or large variance is observed
+
+
 CHANGES IN VERSION 1.0.0
 -------------------------
 
@@ -21,10 +33,11 @@ CHANGES IN VERSION 0.9.9 (07-24-2019)
 
     o add a vignette to the package
 
-    o the default of random number generator changes in R: "Rounding" was the default
-      in `RNGkind()` prior to R_3.6.0, but "Rejection" is used in R (>= v3.6.0). For
-      reproduction of the results created by R (< v3.6.0), please use
-      `RNGkind("Mersenne-Twister", "Inversion", "Rounding")` in R (>= v3.6.0)
+    o the default of random number generator changes in R: "Rounding" was the
+      default in `RNGkind()` prior to R_3.6.0, but "Rejection" is used in
+      R (>= v3.6.0). For reproduction of the results created by R (< v3.6.0),
+      please use `RNGkind("Mersenne-Twister", "Inversion", "Rounding")` in
+      R (>= v3.6.0)
 
 
 CHANGES IN VERSION 0.9.7 (06-08-2019)

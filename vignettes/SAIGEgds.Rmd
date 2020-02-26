@@ -26,7 +26,7 @@ vignette: >
 options(width=110)
 ```
 
-Phenome-wide association study (PheWAS) is known to be a powerful tool in discovery and replication of genetic association studies. The recent development in the UK Biobank resource with deep genomic and phenotyping data has provided unparalleled research opportunities. To reduce the computational complexity and cost of PheWAS, the SAIGE (scalable and accurate implementation of generalized mixed model [1]) method was proposed recently, controlling for case-control imbalance and sample structure in single variant association studies. However, it is still computationally challenging to analyze the associations of thousands of phenotypes with whole-genome variant data, especially for disease diagnoses using the ICD-10 codes of deep phenotyping.
+A phenome-wide association study (PheWAS) is known to be a powerful tool in discovery and replication of genetic association studies. The recent development in the UK Biobank resource with deep genomic and phenotyping data has provided unparalleled research opportunities. To reduce the computational complexity and cost of PheWAS, the SAIGE (scalable and accurate implementation of generalized mixed model [1]) method was proposed recently, controlling for case-control imbalance and sample structure in single variant association studies. However, it is still computationally challenging to analyze the associations of thousands of phenotypes with whole-genome variant data, especially for disease diagnoses using the ICD-10 codes of deep phenotyping.
 
 Here we develop a new high-performance statistical package (SAIGEgds) for large-scale PheWAS using mixed models [2]. In this package, the SAIGE method is implemented with optimized C++ codes taking advantage of sparse structure of genotype dosages. SAIGEgds supports efficient genomic data structure (GDS) files [3] including both integer genotypes and numeric imputed dosages. Benchmarks using the UK Biobank White British genotype data (N=430K) with coronary heart disease and simulated cases, show that SAIGEgds is 5 to 6 times faster than the SAIGE R package in the steps of fitting null models and p-value calculations. When used in conjunction with high-performance computing (HPC) clusters and/or cloud resources, SAIGEgds provides an efficient analysis pipeline for biobank-scale PheWAS.
 
@@ -68,8 +68,7 @@ library(SNPRelate)
 
 set.seed(1000)
 snpset <- snpgdsLDpruning(gds)
-is(snpset)
-names(snpset)
+str(snpset)
 
 snpset.id <- unlist(snpset, use.names=FALSE)  # get the variant IDs of a LD-pruned set
 head(snpset.id)
@@ -83,6 +82,8 @@ seqSetFilter(gds, variant.id=snpset.id)
 # export to a GDS genotype file without annotation data
 seqExport(gds, grm_fn, info.var=character(), fmt.var=character(), samp.var=character())
 ```
+
+If genotypes are split by chromosomes, `seqMerge()` in the SeqArray package can be used to combine the LD-pruned SNP sets.
 
 ```{r}
 # close the file
@@ -106,7 +107,8 @@ pheno <- data.frame(
     stringsAsFactors = FALSE)
 head(pheno)
 
-# model fitting
+# null model fitting using GRM from grm_fn
+grm_fn
 glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_fn, trait.type="binary", sample.col="sample.id")
 ```
 
@@ -115,7 +117,9 @@ glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_fn, trait.type="binary", samp
 ## P-value calculations
 
 ```{r}
-# using 2 processes
+# genetic variants stored in the file geno_fn
+geno_fn
+# calculate, using 2 processes
 assoc <- seqAssocGLMM_SPA(geno_fn, glmm, mac=10, parallel=2)
 
 head(assoc)

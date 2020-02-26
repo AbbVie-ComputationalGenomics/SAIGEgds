@@ -2,10 +2,13 @@
 //
 // SPATest.cpp: C implementation of part of the R SPATest package
 //
-// Copyright (C) 2019    Xiuwen Zheng / AbbVie-ComputationalGenomics
+// Copyright (C) 2019-2020    Xiuwen Zheng / AbbVie-ComputationalGenomics
 //
 // This file is part of SAIGEgds. It was created based on the R codes in the
-// SPAtest package.
+// SPAtest package with the reference:
+//     A Fast and Accurate Algorithm to Test for Binary Phenotypes and Its
+//     Application to PheWAS. Dey R, Schmidt EM, Abecasis GR, Lee S.
+//     Am J Hum Genet. 2017 Jul 6;101(1):37-49. doi:10.1016/j.ajhg.2017.05.014.
 //
 // SAIGEgds is free software: you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 3 as published
@@ -33,7 +36,10 @@ inline static double sq(double v) { return v*v; }
 // inline static int sign(double v) { return (v>0) ? 1 : ((v<0) ? -1 : 0); }
 
 
-inline static COREARRAY_TARGET_CLONES
+// Cumulant-generating function (CGF) of the score statistic: K(t)
+
+/// The log term of CGF
+inline static COREARRAY_TARGET_CLONES MATH_OFAST  // auto-vectorize if possible
 	double Korg(double t, size_t n_g, const double mu[], const double g[])
 {
 	double sum = 0;
@@ -46,8 +52,10 @@ inline static COREARRAY_TARGET_CLONES
 }
 
 
-inline static COREARRAY_TARGET_CLONES
-	double K1_adj(double t, size_t n_g, const double mu[], const double g[], double q)
+/// The first term of the first-order derivative of CGF
+inline static COREARRAY_TARGET_CLONES MATH_OFAST  // auto-vectorize if possible
+	double K1_adj(double t, size_t n_g, const double mu[], const double g[],
+		double q)
 {
 	double sum = 0;
 	for (size_t i=0; i < n_g; i++)
@@ -59,6 +67,7 @@ inline static COREARRAY_TARGET_CLONES
 }
 
 
+/// The second-order derivative of CGF
 inline static COREARRAY_TARGET_CLONES
 	double K2(double t, size_t n_g, const double mu[], const double g[])
 {
@@ -79,6 +88,7 @@ static const double root_tol = sqrt(sqrt(DBL_EPSILON));
 static const int MaxNumIter = 1000;
 
 
+/// Root-finding algorithm for a full saddle-point method
 inline static void COREARRAY_TARGET_CLONES
 	getroot_K1(const double g_pos, const double g_neg,
 		double &root, int &n_iter, bool &converged, double init, size_t n_g,
@@ -124,11 +134,13 @@ inline static void COREARRAY_TARGET_CLONES
 	}
 }
 
+
+/// Root-finding algorithm for a partially normal approximation approach
 inline static void COREARRAY_TARGET_CLONES
-	getroot_K1_fast(const double g_pos, const double g_neg,
-		double &root, int &n_iter, bool &converged, double init, size_t n_nonzero,
-		const double mu[], const double g[], double q, double NAmu, double NAsigma,
-		double tol=root_tol, int maxiter=MaxNumIter)
+	getroot_K1_fast(const double g_pos, const double g_neg, double &root,
+		int &n_iter, bool &converged, double init, size_t n_nonzero,
+		const double mu[], const double g[], double q, double NAmu,
+		double NAsigma, double tol=root_tol, int maxiter=MaxNumIter)
 {
 	if (q>=g_pos || q<=g_neg)
 	{
@@ -151,13 +163,15 @@ inline static void COREARRAY_TARGET_CLONES
 				converged = true;
 				break;
 			}
-			double newK1 = K1_adj(tnew, n_nonzero, mu, g, q) + NAmu + NAsigma * tnew;
+			double newK1 = K1_adj(tnew, n_nonzero, mu, g, q) +
+				NAmu + NAsigma * tnew;
 			if (sign(K1_eval) != sign(newK1))
 			{
 				if (fabs(tnew - t) > prevJump-tol)
 				{
 					tnew = t + sign(newK1 - K1_eval) * prevJump * 0.5;
-					newK1 = K1_adj(tnew, n_nonzero, mu, g, q) + NAmu + NAsigma * tnew;
+					newK1 = K1_adj(tnew, n_nonzero, mu, g, q) +
+						NAmu + NAsigma * tnew;
 					prevJump *= 0.5;
 				} else {
 					prevJump = fabs(tnew - t);
@@ -170,51 +184,56 @@ inline static void COREARRAY_TARGET_CLONES
 }
 
 
+/// Get a p-value from a full saddle-point method
 inline static double COREARRAY_TARGET_CLONES
-	Get_Saddle_Prob(double zeta, size_t n_g, const double mu[], const double g[],
+	get_saddle_prob(double t, size_t n_g, const double mu[], const double g[],
 		double q)
 {
-	double k1 = Korg(zeta, n_g, mu, g);
-	double k2 = K2(zeta, n_g, mu, g);
+	if (!R_FINITE(t)) return 0;
+	double K  = Korg(t, n_g, mu, g);
+	double k2 = K2(t, n_g, mu, g);
 	double pval = 0;
-	if (R_FINITE(k1) && R_FINITE(k1))
+	if (R_FINITE(K) && R_FINITE(k2))
 	{
-		double temp1 = zeta * q - k1;
-		double w = sign(zeta) * sqrt(2 * temp1);
-		double v = zeta * sqrt(k2);
-		double Z_test = w + 1/w * log(v/w);
-		if (Z_test > 0)
-			pval = ::Rf_pnorm5(Z_test, 0, 1, FALSE, FALSE);
+		double w = sign(t) * sqrt(2 * (t * q - K));
+		double v = t * sqrt(k2);
+		double z = w + log(v/w) / w;
+		if (z > 0)
+			pval = ::Rf_pnorm5(z, 0, 1, FALSE, FALSE);
 		else
-			pval = - ::Rf_pnorm5(Z_test, 0, 1, TRUE, FALSE);
+			pval = - ::Rf_pnorm5(z, 0, 1, TRUE, FALSE);
 	}
 	return pval;
 }
 
+
+/// Get a p-value from a partially normal approximation approach
 inline static double COREARRAY_TARGET_CLONES
-	Get_Saddle_Prob_fast(double zeta, size_t n_nonzero, const double mu[],
+	get_saddle_prob_fast(double t, size_t n_nonzero, const double mu[],
 		const double g[], double q, double NAmu, double NAsigma)
 {
-	double k1 = Korg(zeta, n_nonzero, mu, g) + NAmu * zeta + 0.5 * NAsigma * zeta * zeta;
-	double k2 = K2(zeta, n_nonzero, mu, g) + NAsigma;
+	if (!R_FINITE(t)) return 0;
+	double K  = Korg(t, n_nonzero, mu, g) + NAmu * t + 0.5 * NAsigma * t * t;
+	double k2 = K2(t, n_nonzero, mu, g) + NAsigma;
 	double pval = 0;
-	if (R_FINITE(k1) && R_FINITE(k1))
+	if (R_FINITE(K) && R_FINITE(k2))
 	{
-		double temp1 = zeta * q - k1;
-		double w = sign(zeta) * sqrt(2 * temp1);
-		double v = zeta * sqrt(k2);
-		double Z_test = w + 1/w * log(v/w);
-		if (Z_test > 0)
-			pval = ::Rf_pnorm5(Z_test, 0, 1, FALSE, FALSE);
+		double w = sign(t) * sqrt(2 * (t * q - K));
+		double v = t * sqrt(k2);
+		double z = w + log(v/w) / w;
+		if (z > 0)
+			pval = ::Rf_pnorm5(z, 0, 1, FALSE, FALSE);
 		else
-			pval = - ::Rf_pnorm5(Z_test, 0, 1, TRUE, FALSE);
+			pval = - ::Rf_pnorm5(z, 0, 1, TRUE, FALSE);
 	}
 	return pval;
 }
 
 
 
-// m1 <- sum(mu * g),  var1 <- sum(mu * (1-mu) * g^2)
+/// Get a p-value from the CGF of a full saddle-point method
+/// Input: m1 <- sum(mu * g), var1 <- sum(mu * (1-mu) * g^2)
+/// Output: p-value
 extern "C" double COREARRAY_TARGET_CLONES
 	Saddle_Prob(double q, double m1, double var1, size_t n_g, const double mu[],
 		const double g[], double cutoff, bool &converged)
@@ -246,15 +265,15 @@ extern "C" double COREARRAY_TARGET_CLONES
 				}
 			}
 			//
-			double uni1_root, uni2_root;
-			int n_iter1, n_iter2;
-			bool conv1, conv2;
-			getroot_K1(g_pos, g_neg, uni1_root, n_iter1, conv1, 0, n_g, mu, g, q);
-			getroot_K1(g_pos, g_neg, uni2_root, n_iter2, conv2, 0, n_g, mu, g, qinv);
+			double root1, root2;  // the roots of equation
+			int ni1, ni2;  // the number of iterations
+			bool conv1, conv2;  // whether the algorithm converges or not
+			getroot_K1(g_pos, g_neg, root1, ni1, conv1, 0, n_g, mu, g, q);
+			getroot_K1(g_pos, g_neg, root2, ni2, conv2, 0, n_g, mu, g, qinv);
 			if (conv1 && conv2)
 			{
-				double p1 = Get_Saddle_Prob(uni1_root, n_g, mu, g, q);
-				double p2 = Get_Saddle_Prob(uni2_root, n_g, mu, g, qinv);
+				double p1 = get_saddle_prob(root1, n_g, mu, g, q);
+				double p2 = get_saddle_prob(root2, n_g, mu, g, qinv);
 				pval = fabs(p1) + fabs(p2);
 			} else {
 				pval = pval_noadj;
@@ -272,11 +291,15 @@ extern "C" double COREARRAY_TARGET_CLONES
 }
 
 
-// m1 <- sum(mu * g),  var1 <- sum(mu * (1-mu) * g^2)
+/// Get a p-value from faster calculation of the CGF by a partially
+///     normal approximation approach
+/// Input: m1 <- sum(mu * g), var1 <- sum(mu * (1-mu) * g^2)
+/// Output: p-value
 extern "C" double COREARRAY_TARGET_CLONES
-	Saddle_Prob_Fast(double q, double m1, double var1, size_t n_g, const double mu[],
-		const double g[], size_t n_nonzero, const int nonzero_idx[], double cutoff,
-		bool &converged, double buf_spa[])
+	Saddle_Prob_Fast(double q, double m1, double var1, size_t n_g,
+		const double mu[], const double g[], size_t n_nonzero,
+		const int nonzero_idx[], double cutoff, bool &converged,
+		double buf_spa[])
 {
 	double s = q - m1;
 	double qinv = -s + m1;
@@ -319,18 +342,18 @@ extern "C" double COREARRAY_TARGET_CLONES
 				g = &buf_spa[0]; mu = &buf_spa[n_nonzero];
 			}
 			//
-			double uni1_root, uni2_root;
-			int n_iter1, n_iter2;
-			bool conv1, conv2;
-			getroot_K1_fast(g_pos, g_neg, uni1_root, n_iter1, conv1, 0, n_nonzero,
+			double root1, root2;  // the roots of equation
+			int ni1, ni2;  // the number of iterations
+			bool conv1, conv2;  // whether the algorithm converges or not
+			getroot_K1_fast(g_pos, g_neg, root1, ni1, conv1, 0, n_nonzero,
 				mu, g, q, NAmu, NAsigma);
-			getroot_K1_fast(g_pos, g_neg, uni2_root, n_iter2, conv2, 0, n_nonzero,
+			getroot_K1_fast(g_pos, g_neg, root2, ni2, conv2, 0, n_nonzero,
 				mu, g, qinv, NAmu, NAsigma);
 			if (conv1 && conv2)
 			{
-				double p1 = Get_Saddle_Prob_fast(uni1_root, n_nonzero, mu, g, q,
+				double p1 = get_saddle_prob_fast(root1, n_nonzero, mu, g, q,
 					NAmu, NAsigma);
-				double p2 = Get_Saddle_Prob_fast(uni2_root, n_nonzero, mu, g, qinv,
+				double p2 = get_saddle_prob_fast(root2, n_nonzero, mu, g, qinv,
 					NAmu, NAsigma);
 				pval = fabs(p1) + fabs(p2);
 			} else {

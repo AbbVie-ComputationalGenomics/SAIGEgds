@@ -2,70 +2,79 @@
 \alias{seqAssocGLMM_SPA}
 \title{P-value calculation}
 \description{
-    P-value calculations using variance approximation and an adjustment of Saddlepoint
-approximation.
+    P-value calculations using variance approximation and an adjustment of
+Saddlepoint approximation.
 }
 
 \usage{
-seqAssocGLMM_SPA(gdsfile, modobj, maf=NaN, mac=10, dsnode="", spa.pval=0.05,
-    var.ratio=NaN, res.savefn="",
-    res.compress=c("LZMA", "LZMA_RA", "ZIP", "ZIP_RA", "none"), parallel=FALSE,
-    verbose=TRUE)
+seqAssocGLMM_SPA(gdsfile, modobj, maf=NaN, mac=10, missing=0.1, dsnode="",
+    spa.pval=0.05, var.ratio=NaN, res.savefn="", res.compress="LZMA",
+    parallel=FALSE, verbose=TRUE)
 }
 
 \arguments{
     \item{gdsfile}{a SeqArray GDS filename, or a GDS object}
     \item{modobj}{an R object for SAIGE model parameters}
-    \item{maf}{minor allele frequency threshold (>= maf)}
-    \item{mac}{minor allele count threshold (>= mac)}
+    \item{maf}{minor allele frequency threshold (checking >= maf)}
+    \item{mac}{minor allele count threshold (checking >= mac)}
+    \item{missing}{missing threshold for variants (checking <= missing)}
     \item{dsnode}{"" for automatically searching the GDS nodes "genotype" and
         "annotation/format/DS", or use a user-defined GDS node in the file}
-    \item{spa.pval}{the p-value threshold for SPA adjustment, 0.05 by default}
-    \item{var.ratio}{\code{NaN} for using the estimated variance ratio in the model
-        fitting, or a user-defined variance ratio}
+    \item{spa.pval}{the p-value threshold for SPA adjustment, 0.05 by default
+        (since normal approximation performs well when the test statistic is
+        close to the mean)}
+    \item{var.ratio}{\code{NaN} for using the estimated variance ratio in the
+        model fitting, or a user-defined variance ratio}
     \item{res.savefn}{an RData or GDS file name, "" for no saving}
-    \item{res.compress}{the compression method for the output file}
-    \item{parallel}{\code{FALSE} (serial processing), \code{TRUE} (multicore processing),
-        a numeric value for the number of cores, or other value; \code{parallel} is
-        passed to the argument \code{cl} in \code{\link{seqParallel}}, see
-        \code{\link{seqParallel}} for more details}
+    \item{res.compress}{the compression method for the output file, it should
+        be one of LZMA, LZMA_RA, ZIP, ZIP_RA and none}
+    \item{parallel}{\code{FALSE} (serial processing), \code{TRUE} (multicore
+        processing), a numeric value for the number of cores, or other value;
+        \code{parallel} is passed to the argument \code{cl} in
+        \code{\link{seqParallel}}, see \code{\link{seqParallel}} for more
+        details}
     \item{verbose}{if \code{TRUE}, show information}
 }
 
 \details{
-    The original SAIGE R package uses 0.05 as a threshold for unadjusted p-values to
-further calculate SPA-adjusted p-values. If \code{var.ratio=NaN}, the average of variance
-ratios (\code{mean(modobj$var.ratio$ratio)}) is used instead.
+    The original SAIGE R package uses 0.05 as a threshold for unadjusted
+p-values to further calculate SPA-adjusted p-values. If \code{var.ratio=NaN},
+the average of variance ratios (\code{mean(modobj$var.ratio$ratio)}) is used
+instead.
     For more details of SAIGE algorithm, please refer to the SAIGE paper
 [Zhou et al. 2018] (see the reference section).
 }
 
 \value{
-    Return a \code{data.frame} with the following components if not saving to a file:
-    \code{id}, variant ID in the GDS file;
-    \code{chr}, chromosome;
-    \code{pos}, position;
-    \code{rs.id}, the RS IDs if it is available in the GDS file;
-    \code{ref}, the reference allele;
-    \code{alt}, the alternative allele;
-    \code{AF.alt}, allele frequency for the alternative allele;
-    \code{AC.alt}, allele count for the alternative allele;
-    \code{num}, the number of samples with non-missing genotypes;
-    \code{beta}, beta coefficient, odds ratio if binary outcomes (alternative allele
-        vs. reference allele);
-    \code{SE}, standard error for beta coefficient;
-    \code{pval}, adjusted p-value with SPA;
-    \code{pval.noadj}, p-value without adjustment (it is used for model checking only);
-    \code{converged}, whether the SPA algorithm converges or not for adjusted p-value
+    Return a \code{data.frame} with the following components if not saving to
+a file:
+    \item{id}{variant ID in the GDS file;}
+    \item{chr}{chromosome;}
+    \item{pos}{position;}
+    \item{rs.id}{the RS IDs if it is available in the GDS file;}
+    \item{ref}{the reference allele;}
+    \item{alt}{the alternative allele;}
+    \item{AF.alt}{allele frequency for the alternative allele; the minor allele
+        frequency is \code{pmin(AF.alt, 1-AF.alt)}}
+    \item{mac}{minor allele count; the allele count for the alternative allele
+        is \code{ifelse(AF.alt<=0.5, mac, 2*num-mac)}}
+    \item{num}{the number of samples with non-missing genotypes;}
+    \item{beta}{beta coefficient, odds ratio if binary outcomes (alternative
+        allele vs. reference allele);}
+    \item{SE}{standard error for beta coefficient;}
+    \item{pval}{adjusted p-value with SPA;}
+    \item{pval.noadj}{p-value without adjustment (it is used for model
+        checking only);}
+    \item{converged}{whether the SPA algorithm converges or not for adjusted
+        p-values.}
 }
 
 \references{
-    Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J,
-    VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K,
-    Kang HM, Abecasis GR, Willer CJ, Lee S.
-    Efficiently controlling for case-control imbalance and sample relatedness in
-    large-scale genetic association studies.
-    Nat Genet (2018). Sep;50(9):1335-1341.
+    Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN,
+LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ,
+Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S.
+Efficiently controlling for case-control imbalance and sample relatedness in
+large-scale genetic association studies. Nat Genet (2018). Sep;50(9):1335-1341.
 }
 \author{Xiuwen Zheng}
 \seealso{

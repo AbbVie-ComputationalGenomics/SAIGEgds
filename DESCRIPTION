@@ -1,8 +1,9 @@
 Package: SAIGEgds
 Type: Package
-Title: Scalable Implementation of Generalized mixed models using GDS files in PheWAS
-Version: 1.0.0
-Date: 2019-10-30
+Title: Scalable Implementation of Generalized mixed models using GDS files in
+        Phenome-Wide Association Studies
+Version: 1.0.1
+Date: 2020-01-28
 Depends: R (>= 3.5.0), gdsfmt (>= 1.20.0), SeqArray (>= 1.24.1), Rcpp
 LinkingTo: Rcpp, RcppArmadillo, RcppParallel
 Imports: methods, stats, utils, RcppParallel, SPAtest (>= 3.0.0)
@@ -12,15 +13,15 @@ Authors@R: c(person("Xiuwen", "Zheng", role=c("aut", "cre"),
         person("Wei", "Zhou", role="ctb",
         comment="the original author of the SAIGE R package"),
         person("J. Wade", "Davis", role="ctb"))
-Description: Scalable implementation of generalized mixed models with highly optimized
-        C++ implementation and integration with Genomic Data Structure (GDS) files.
-        It is designed for single variant tests in large-scale phenome-wide association
-        studies (PheWAS) with millions of variants and samples, controlling for sample
-        structure and case-control imbalance. The implementation is based on the original
-        SAIGE R package (v0.29.4.4). SAIGEgds also implements some of the SPAtest
-        functions in C to speed up the calculation of Saddlepoint approximation.
-        Benchmarks show that SAIGEgds is 5 to 6 times faster than the original SAIGE R
-        package.
+Description: Scalable implementation of generalized mixed models with highly
+        optimized C++ implementation and integration with Genomic Data Structure
+        (GDS) files. It is designed for single variant tests in large-scale
+        phenome-wide association studies (PheWAS) with millions of variants and
+        samples, controlling for sample structure and case-control imbalance.
+        The implementation is based on the original SAIGE R package (v0.29.4.4).
+        SAIGEgds also implements some of the SPAtest functions in C to speed up
+        the calculation of Saddlepoint approximation. Benchmarks show that
+        SAIGEgds is 5 to 6 times faster than the original SAIGE R package.
 License: GPL-3
 SystemRequirements: C++11, GNU make
 VignetteBuilder: knitr

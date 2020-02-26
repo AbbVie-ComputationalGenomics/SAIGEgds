@@ -78,7 +78,6 @@ browseVignettes("SAIGEgds")
 ## Examples
 
 ```R
-library(SeqArray)
 library(SAIGEgds)
 
 # open the GDS file for genetic relationship matrix (GRM)
@@ -96,7 +95,8 @@ head(pheno)
 ## ...
 
 # fit the null model
-glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_gds, trait.type="binary", sample.col="sample.id", num.thread=2)
+glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_gds, trait.type="binary",
+    sample.col="sample.id", num.thread=2)
 ## SAIGE association analysis:
 ## Filtering variants:
 ## [==================================================] 100%, completed, 0s
@@ -129,18 +129,21 @@ assoc <- seqAssocGLMM_SPA(geno_gds, glmm, mac=10, parallel=2)
 ## SAIGE association analysis:
 ##     # of samples: 1,000
 ##     # of variants: 100
+##     MAF threshold: NaN
+##     MAC threshold: 10
+##     missing threshold for variants: 0.1
 ##     p-value threshold for SPA adjustment: 0.05
 ##     variance ratio for approximation: 0.9391186
 ##     # of processes: 2
 ## [==================================================] 100%, completed, 0s
-## # of variants after filtering MAF/MAC: 38
+## # of variants after filtering by MAF, MAC and missing thresholds: 38
 ## Done.
 
 head(assoc)
-##   id chr pos rs.id ref alt AF.alt AC.alt  num      beta       SE     pval pval.noadj converged
-## 1  4   1   4   rs4   A   C 0.0100     20 1000 -0.074992 0.791685 0.924533   0.924533      TRUE
-## 2 12   1  12  rs12   A   C 0.0150     30 1000 -0.091001 0.657140 0.889861   0.889861      TRUE
-## 3 14   1  14  rs14   A   C 0.0375     75 1000 -0.075455 0.434152 0.862023   0.862023      TRUE
+##   id chr pos rs.id ref alt AF.alt mac  num       beta        SE      pval pval.noadj converged
+## 1  4   1   4   rs4   A   C 0.0100  20 1000  -0.074992  0.791685  0.924533   0.924533      TRUE
+## 2 12   1  12  rs12   A   C 0.0150  30 1000  -0.091001  0.657140  0.889861   0.889861      TRUE
+## 3 14   1  14  rs14   A   C 0.0375  75 1000  -0.075455  0.434152  0.862023   0.862023      TRUE
 ## ...
 
 

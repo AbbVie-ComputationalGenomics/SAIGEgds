@@ -2,13 +2,13 @@
 //
 // saige_fitnull.cpp: C++ implementation of fitting the null model
 //
-// Copyright (C) 2019    Xiuwen Zheng / AbbVie-ComputationalGenomics
+// Copyright (C) 2019-2020    Xiuwen Zheng / AbbVie-ComputationalGenomics
 //
 // This file is part of SAIGEgds. It was created based on the original SAIGE
 // C++ and R codes in the SAIGE package. Compared with the original SAIGE,
-// I changed all single-precision floating-point numbers to double precision,
-// and a more efficient algorithm with packed 2-bit and sparse genotypes is implemented
-// to calculate the cross product of genetic relationship matrix.
+// all single-precision floating-point numbers are changed to double precision,
+// and a more efficient algorithm with packed 2-bit and sparse genotypes is
+// implemented to calculate the cross product of genetic relationship matrix.
 //
 // SAIGEgds is free software: you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 3 as published
@@ -139,8 +139,8 @@ inline static double ds_nan(BYTE g) { return (g < 3) ? g : R_NaN; }
 
 
 /// Store SNP genotype in the 2-bit packed format
-RcppExport SEXP saige_store_2b_geno(SEXP rawgeno, SEXP num_samp, SEXP r_buf_geno,
-	SEXP r_buf_sigma, SEXP r_buf_crossprod)
+RcppExport SEXP saige_store_2b_geno(SEXP rawgeno, SEXP num_samp,
+	SEXP r_buf_geno, SEXP r_buf_sigma, SEXP r_buf_crossprod)
 {
 BEGIN_RCPP
 
@@ -254,8 +254,8 @@ END_RCPP
 
 
 /// Initialize sparse structure of genotypes
-RcppExport SEXP saige_store_sp_geno(SEXP sp_geno_list, SEXP num_samp, SEXP r_buf_geno,
-	SEXP r_buf_sigma, SEXP r_buf_crossprod)
+RcppExport SEXP saige_store_sp_geno(SEXP sp_geno_list, SEXP num_samp,
+	SEXP r_buf_geno, SEXP r_buf_sigma, SEXP r_buf_crossprod)
 {
 BEGIN_RCPP
 
@@ -360,9 +360,9 @@ static void get_geno_ds(int snp_idx, dvec &ds)
 
 // ========================================================================= //
 
-/// Cross-product of standardized genotypes and a numeric vector
+/// Cross-product of standardized genotypes (G) and a numeric vector
 /// Input: b (n_samp-length)
-/// Output: out_b (n_samp-length)
+/// Output: out_b (n_samp-length) = GRM * b = G' G b
 static COREARRAY_TARGET_CLONES MATH_OFAST
 	void get_crossprod_b_grm(const dcolvec &b, dvec &out_b)
 {
@@ -379,8 +379,7 @@ static COREARRAY_TARGET_CLONES MATH_OFAST
 		PARALLEL_FOR(i, Geno_NumVariant, true)
 		{
 			const double *p = &buf_std_geno[4*i], *pb = &b[0];
-			const int *pg = INTEGER(VECTOR_ELT(Geno_Sparse, i));
-			const int *ii = pg + 3;
+			const int *pg = INTEGER(VECTOR_ELT(Geno_Sparse, i)), *ii = pg + 3;
 			// g0 * b
 			double dot = sum_b * p[0];
 			// g1 * b
@@ -391,7 +390,7 @@ static COREARRAY_TARGET_CLONES MATH_OFAST
 			for (int k=0; k < pg[2]; k++) dot += p[3] * pb[*ii++];
 
 			// update buf_crossprod += dot .* std.geno
-			double *pbb = buf_crossprod + Geno_NumSamp * th_idx, v;
+			double v, *pbb = buf_crossprod + Geno_NumSamp * th_idx;
 			ii = pg + 3;
 			// g0 * dot
 			sum_cp_g0[th_idx] += dot * p[0];
@@ -411,11 +410,10 @@ static COREARRAY_TARGET_CLONES MATH_OFAST
 		PARALLEL_FOR(i, Geno_NumVariant, true)
 		{
 			const BYTE *g = Geno_PackedRaw + Geno_PackedNumSamp*i;
-			const double *base = buf_std_geno + 4*i;
+			const double *base = buf_std_geno + 4*i, *pb = &b[0];
 
 			// get dot = sum(std.geno .* b)
 			double dot = 0;
-			const double *pb = &b[0];
 			size_t n = Geno_NumSamp;
 			for (; n >= 4; n-=4, pb+=4)
 			{
@@ -459,11 +457,8 @@ static COREARRAY_TARGET_CLONES MATH_OFAST
 		const double *s = buf_crossprod + st;
 		double *p = &out_b[st];
 		memset(p, 0, sizeof(double)*len);
-		for (int i=0; i < NumThreads; i++)
-		{
+		for (int i=0; i < NumThreads; i++, s += Geno_NumSamp)
 			f64_add(len, s, p);
-			s += Geno_NumSamp;
-		}
 		if (!Geno_PackedRaw)
 			f64_add(len, sum_g0, p);
 		f64_mul(len, 1.0/Geno_NumVariant, p);
@@ -472,7 +467,7 @@ static COREARRAY_TARGET_CLONES MATH_OFAST
 }
 
   
-/// Sigma = tau[0] * diag(1/W) + tau[1] * diag(grm)
+/// Diagonal Sigma = tau[0] * diag(1/W) + tau[1] * diag(GRM)
 /// Input: w, tau
 /// Output: out_sigma
 static COREARRAY_TARGET_CLONES
@@ -482,25 +477,25 @@ static COREARRAY_TARGET_CLONES
 	PARALLEL_RANGE(st, ed, Geno_NumSamp, false)
 	{
 		const double tau0 = tau[0], tau1 = tau[1];
+		double *out = &out_sigma[0];
 		for (size_t i=st; i < ed; i++)
 		{
 			double v = tau0 / w[i] + tau1 * buf_diag_grm[i];
 			if (v < 1e-4) v = 1e-4;
-			out_sigma[i] = v;
+			out[i] = v;
 		}
 	}
 	PARALLEL_END
 }
 
 
-/// Sigma = tau[0] * b * diag(1/W) + tau[1] * diag(grm, b)
+/// Diagonal Sigma = tau[0] * b * diag(1/W) + tau[1] * diag(GRM, b)
 /// Input: w, tau
 /// Output: out_sigma
 static COREARRAY_TARGET_CLONES
 	dvec get_crossprod(const dcolvec &b, const dvec& w, const dvec& tau)
 {
-	const double tau0 = tau[0];
-	const double tau1 = tau[1];
+	const double tau0 = tau[0], tau1 = tau[1];
 	if (tau1 == 0)
 	{
 		return(tau0 * (b % (1/w)));
@@ -512,16 +507,15 @@ static COREARRAY_TARGET_CLONES
 }
 
 
-/// Sigma = tau[0] * diag(1/W) + tau[1] * grm
+/// PCG algorithm for diagonal of Sigma = tau[0] * diag(1/W) + tau[1] * GRM
 /// Input: w, tau, b, maxiterPCG, tolPCG
 static COREARRAY_TARGET_CLONES
-	dvec get_PCG_diag_sigma(const dvec &w, const dvec &tau, const dvec &b,
+	dvec PCG_diag_sigma(const dvec &w, const dvec &tau, const dvec &b,
 		int maxiterPCG, double tolPCG)
 {
 	dvec r = b, r1, minv;
 	get_diag_sigma(w, tau, minv);
 	minv = 1 / minv;
-	double sumr2 = sum(r % r);
 
 	dvec z = minv % r, z1;
 	dvec p = z;
@@ -529,7 +523,7 @@ static COREARRAY_TARGET_CLONES
 	x.zeros();
 
 	int iter = 0;
-	while (sumr2 > tolPCG && iter < maxiterPCG)
+	while ((iter < maxiterPCG) && (sum(r % r) > tolPCG))
 	{
 		iter = iter + 1;
 		dvec Ap = get_crossprod(p, w, tau);
@@ -542,8 +536,6 @@ static COREARRAY_TARGET_CLONES
 		p = z1 + bet*p;
 		z = z1;
 		r = r1;
-
-		sumr2 = sum(r % r);
 	}
 
 	if (iter >= maxiterPCG)
@@ -558,7 +550,7 @@ inline static double calcCV(const dvec &x)
 {
 	double x_mean = mean(x);
 	double x_sd = stddev(x);
-	return((x_sd / x_mean) / int(x.n_elem));
+	return(x_sd / (x_mean * int(x.n_elem)));
 }
 
 
@@ -579,12 +571,14 @@ static double get_trace(const dmat &Sigma_iX, const dmat& X, const dvec& w,
 	dvec buf(nrun);
 	buf.zeros();
 
+	// Hutchinson's randomized trace estimator
 	while (traceCV > traceCVcutoff)
 	{
 		for (int i=nrunStart; i < nrunEnd; i++)
 		{
+			// buf[i] = Pu Au = (u' P) (G' G u) = u' P G' G u
 			u = 2 * as<dvec>(rbinom(Geno_NumSamp, 1, 0.5)) - 1;
-			Sigma_iu = get_PCG_diag_sigma(w, tau, u, maxiterPCG, tolPCG);
+			Sigma_iu = PCG_diag_sigma(w, tau, u, maxiterPCG, tolPCG);
 			Pu = Sigma_iu - Sigma_iX * (cov *  (Sigma_iXt * u));
 			get_crossprod_b_grm(u, Au);
 			buf[i] = dot(Au, Pu);
@@ -623,12 +617,14 @@ static void get_trace_q(const dmat &Sigma_iX, const dmat& X, const dvec& w,
 	dvec buf(nrun), buf0(nrun);
 	buf.zeros(); buf0.zeros();
 
+	// Hutchinson's randomized trace estimator
 	while ((traceCV > traceCVcutoff) || (traceCV0 > traceCVcutoff))
 	{
 		for (int i=nrunStart; i < nrunEnd; i++)
 		{
+			// buf[i] = Pu Au = (u' P) (G' G u) = u' P G' G u
 			u = 2 * as<dvec>(rbinom(Geno_NumSamp, 1, 0.5)) - 1;
-			Sigma_iu = get_PCG_diag_sigma(w, tau, u, maxiterPCG, tolPCG);
+			Sigma_iu = PCG_diag_sigma(w, tau, u, maxiterPCG, tolPCG);
 			Pu = Sigma_iu - Sigma_iX * (cov *  (Sigma_iXt * u));
 			get_crossprod_b_grm(u, Au);
 			buf[i]  = dot(Au, Pu);
@@ -653,41 +649,63 @@ static void get_trace_q(const dmat &Sigma_iX, const dmat& X, const dvec& w,
 }
 
 
-/// Calculate fixed and random effect coefficients
+/// matrix inverse
+inline static dmat mat_inv(const dmat &m)
+{
+	dmat rv, xs = symmatu(m);
+	if (!auxlib::inv_sympd(rv, xs))
+	{
+		// xs is singular or not positive definite (possibly due to rounding error)
+		// try inv(), if inv() still fails throw an exception and stop fitting
+		Rprintf("Warning: arma::inv_sympd(), matrix is singular or not positive definite, use arma::inv() instead.\n");
+		rv = inv(xs);
+	}
+	return rv;
+}
+
+
+/// Calculate fixed and random effect coefficients given Y, X, w, tau
 /// Input:  Y, X, w, tau, maxiterPCG, tolPCG
 /// Output: Sigma_iY, Sigma_iX, cov, alpha, eta
-static void get_coefficients(const dvec &Y, const dmat &X, const dvec &w,
+static void get_coeff_w(const dvec &Y, const dmat &X, const dvec &w,
 	const dvec &tau, int maxiterPCG, double tolPCG,
 	dvec &Sigma_iY, dmat &Sigma_iX, dmat &cov, dvec &alpha, dvec &eta)
 {
 	int n_col_X = X.n_cols;
-	Sigma_iY = get_PCG_diag_sigma(w, tau, Y, maxiterPCG, tolPCG);
+	Sigma_iY = PCG_diag_sigma(w, tau, Y, maxiterPCG, tolPCG);
+	// Sigma_iX = (X' Sigma^-1)'
 	Sigma_iX.resize(Geno_NumSamp, n_col_X);
 	dvec xv_i;
 	for(int i = 0; i < n_col_X; i++)
 	{
 		xv_i = X.col(i);
-		Sigma_iX.col(i) = get_PCG_diag_sigma(w, tau, xv_i, maxiterPCG, tolPCG);
+		Sigma_iX.col(i) = PCG_diag_sigma(w, tau, xv_i, maxiterPCG, tolPCG);
 	}
-	cov = inv_sympd(symmatu(X.t() * Sigma_iX));
+	// cov = (X' Sigma^-1 X)^-1
+	cov = mat_inv(X.t() * Sigma_iX);
+	// alpha = (X' Sigma^-1 X)^-1 X' Sigma^-1 Y
 	alpha = cov * (Sigma_iX.t() * Y);
 	eta = Y - tau[0] * (Sigma_iY - Sigma_iX * alpha) / w;
 }
 
 
 ///
-static dmat get_sigma_X(dvec &w, dvec &tau, dmat &X, int maxiterPCG, double tolPCG)
+static dmat get_sigma_X(dvec &w, dvec &tau, dmat &X, int maxiterPCG,
+	double tolPCG)
 {
 	int ncol = X.n_cols;
 	dmat Sigma_iX1(Geno_NumSamp, ncol);
 	for(int i = 0; i < ncol; i++)
-		Sigma_iX1.col(i) = get_PCG_diag_sigma(w, tau, X.col(i), maxiterPCG, tolPCG);
+		Sigma_iX1.col(i) = PCG_diag_sigma(w, tau, X.col(i), maxiterPCG, tolPCG);
 	return(Sigma_iX1);
 }
 
 
 // ========================================================================= //
 
+/// Calculate fixed and random effect coefficients given Y, X, tau
+/// Input:  Y, X, tau, ...
+/// Output: alpha, eta, W, ...
 static void get_coeff(const dvec &y, const dmat &X, const dvec &tau,
 	const List &family, const dvec &alpha0, const dvec &eta0,
 	const dvec &offset, int maxiterPCG, int maxiter, double tolPCG,
@@ -706,12 +724,12 @@ static void get_coeff(const dvec &y, const dmat &X, const dvec &tau,
 	Y = eta0 - offset + (y - mu)/mu_eta;
 	W = (mu_eta % mu_eta) / as<dvec>(fc_variance(mu));
 
-	// iteration
+	// iterate ...
 	dvec a0 = alpha0;
 	for (int i=0; i < maxiter; i++)
 	{
-		get_coefficients(Y, X, W, tau, maxiterPCG, tolPCG,
-			Sigma_iY, Sigma_iX, cov, alpha, eta);
+		get_coeff_w(Y, X, W, tau, maxiterPCG, tolPCG, Sigma_iY, Sigma_iX,
+			cov, alpha, eta);
 
 		eta += offset;
 		mu = as<dvec>(fc_linkinv(eta));
@@ -740,7 +758,7 @@ static void get_AI_score(const dvec &Y, const dmat &X, const dvec &w,
 	outYPAPY = dot(PY, APY);
 	outTrace = get_trace(Sigma_iX, X, w, tau, cov, nrun, maxiterPCG, tolPCG,
 		traceCVcutoff, seed);
-	dvec PAPY_1 = get_PCG_diag_sigma(w, tau, APY, maxiterPCG, tolPCG);
+	dvec PAPY_1 = PCG_diag_sigma(w, tau, APY, maxiterPCG, tolPCG);
 	dvec PAPY = PAPY_1 - Sigma_iX * (cov * (Sigma_iXt * PAPY_1));
 	outAI = dot(APY, PAPY);
 }
@@ -764,10 +782,10 @@ static void get_AI_score_q(const dvec &Y, const dmat &X, const dvec &w,
 		traceCVcutoff, seed, outTrace[0], outTrace[1]);
 	// get AI
 	dmat AI(2,2);
-	dvec PA0PY_1 = get_PCG_diag_sigma(w, tau, A0PY, maxiterPCG, tolPCG);
+	dvec PA0PY_1 = PCG_diag_sigma(w, tau, A0PY, maxiterPCG, tolPCG);
 	dvec PA0PY = PA0PY_1 - Sigma_iX * (cov * (Sigma_iXt * PA0PY_1));
 	AI(0,0) = dot(A0PY, PA0PY);
-	dvec PAPY_1 = get_PCG_diag_sigma(w, tau, APY, maxiterPCG, tolPCG);
+	dvec PAPY_1 = PCG_diag_sigma(w, tau, APY, maxiterPCG, tolPCG);
 	dvec PAPY = PAPY_1 - Sigma_iX * (cov * (Sigma_iXt * PAPY_1));
 	AI(1,1) = dot(APY, PAPY);
 	AI(1,0) = AI(0,1) = dot(A0PY, PAPY);
@@ -776,9 +794,10 @@ static void get_AI_score_q(const dvec &Y, const dmat &X, const dvec &w,
 
 
 // Update tau for binary outcomes
-static dvec fitglmmaiRPCG(const dvec &Y, const dmat &X, const dvec &w, const dvec &in_tau,
-	const dvec &Sigma_iY, const dmat &Sigma_iX, const dmat &cov,
-	int nrun, int maxiterPCG, double tolPCG, double tol, double traceCVcutoff, int seed)
+static dvec fitglmmaiRPCG(const dvec &Y, const dmat &X, const dvec &w,
+	const dvec &in_tau, const dvec &Sigma_iY, const dmat &Sigma_iX,
+	const dmat &cov, int nrun, int maxiterPCG, double tolPCG, double tol,
+	double traceCVcutoff, int seed)
 {
 	double YPAPY, Trace, AI;
 	get_AI_score(Y, X, w, in_tau, Sigma_iY, Sigma_iX, cov, nrun,
@@ -807,9 +826,10 @@ static dvec fitglmmaiRPCG(const dvec &Y, const dmat &X, const dvec &w, const dve
 }
 
 // Update tau for quantitative outcomes
-static dvec fitglmmaiRPCG_q(const dvec &Y, const dmat &X, const dvec &w, const dvec &in_tau,
-	const dvec &Sigma_iY, const dmat &Sigma_iX, const dmat &cov,
-	int nrun, int maxiterPCG, double tolPCG, double tol, double traceCVcutoff, int seed)
+static dvec fitglmmaiRPCG_q(const dvec &Y, const dmat &X, const dvec &w,
+	const dvec &in_tau, const dvec &Sigma_iY, const dmat &Sigma_iX,
+	const dmat &cov, int nrun, int maxiterPCG, double tolPCG, double tol,
+	double traceCVcutoff, int seed)
 {
 	uvec zero_v = (in_tau < tol);
 	double YPAPY[2], Trace[2];
@@ -842,7 +862,7 @@ static dvec fitglmmaiRPCG_q(const dvec &Y, const dmat &X, const dvec &w, const d
 // ========================================================================= //
 
 /// Print a numeric vector
-inline static void print_vec(const char *s, dvec &x)
+inline static void print_vec(const char *s, dvec &x, bool nl=true)
 {
 	Rprintf("%s(", s);
 	for (size_t i=0; i < x.n_elem; i++)
@@ -850,7 +870,7 @@ inline static void print_vec(const char *s, dvec &x)
 		if (i > 0) Rprintf(", ");
 		Rprintf("%0.7g", x[i]);
 	}
-	Rprintf(")\n");
+	if (nl) Rprintf(")\n"); else Rprintf(")");
 }
 
 
@@ -909,9 +929,8 @@ BEGIN_RCPP
 	tau[1] = std::max(0.0, tau0[1] + tau0[1]*tau0[1]*(YPAPY - Trace)/y.size());
 	if (verbose)
 	{
-		Rprintf(
-			"Initial variance component estimates, tau:\n    Sigma_E: %g, Sigma_G: %g\n",
-			tau[0], tau[1]);
+		Rprintf("Initial variance component estimates, tau:\n");
+		Rprintf("    Sigma_E: %g, Sigma_G: %g\n", tau[0], tau[1]);
 	}
 
 	int iter = 1;
@@ -927,25 +946,41 @@ BEGIN_RCPP
 		alpha0 = re_alpha;
 		tau0 = tau;
 		eta0 = eta;
-		get_coeff(y, X, tau, family, alpha0, eta0, offset, maxiterPCG, maxiter,
-			tolPCG, verbose,
-			re_Y, re_mu, re_alpha, re_eta, re_W, re_cov, re_Sigma_iY, re_Sigma_iX);
-		tau = fitglmmaiRPCG(re_Y, X, re_W, tau, re_Sigma_iY,
-			re_Sigma_iX, re_cov, nrun, maxiterPCG, tolPCG,
-			tol, traceCVcutoff, seed);
+
+		// find the next tau
+		for (int itry=1; itry <= 11; itry++)
+		{
+			get_coeff(y, X, tau0, family, alpha0, eta0, offset, maxiterPCG,
+				maxiter, tolPCG, verbose,
+				re_Y, re_mu, re_alpha, re_eta, re_W, re_cov, re_Sigma_iY, re_Sigma_iX);
+			tau = fitglmmaiRPCG(re_Y, X, re_W, tau0, re_Sigma_iY, re_Sigma_iX,
+				re_cov, nrun, maxiterPCG, tolPCG, tol, traceCVcutoff, seed);
+			if (max(tau) > tol_inv_2)
+			{
+				if (itry <= 10)
+				{
+					tau0[1] *= 0.5;
+					if (verbose)
+					{
+						print_vec("    tau: ", tau, false);
+						Rprintf(", large variance estimate observed, retry (%d) ...\n", itry);
+						print_vec("    set new tau: ", tau0);
+					}
+					continue;
+				} else {
+					if (verbose) print_vec("tau: ", tau);
+					throw std::overflow_error(
+					"Large variance estimate observed in the iterations, model not converged!");
+				}
+			}
+			break;
+		}
 
 		cov = re_cov; alpha = re_alpha; eta = re_eta;
 		Y = re_Y; mu = re_mu;
 
 		if (tau[1] == 0) break;
 		if (max(abs(tau-tau0) / (abs(tau)+abs(tau0)+tol)) < tol) break;
-		if (max(tau) > tol_inv_2)
-		{
-			throw std::overflow_error(
-				"Large variance estimate observed in the iterations, model not converged!");
-			iter = maxiter + 1;
-			break;
-		}
 	}
 
 	get_coeff(y, X, tau, family, alpha0, eta0, offset, maxiterPCG, maxiter,
@@ -1023,9 +1058,8 @@ BEGIN_RCPP
 
 	if (verbose)
 	{
-		Rprintf(
-			"Initial variance component estimates, tau:\n    Sigma_E: %g, Sigma_G: %g\n",
-			tau[0], tau[1]);
+		Rprintf("Initial variance component estimates, tau:\n");
+		Rprintf("    Sigma_E: %g, Sigma_G: %g\n", tau[0], tau[1]);
 	}
 
 	double YPAPY[2], Trace[2];
@@ -1050,12 +1084,36 @@ BEGIN_RCPP
 		alpha0 = re_alpha;
 		tau0 = tau;
 		eta0 = eta;
-		get_coeff(y, X, tau, family, alpha0, eta0, offset, maxiterPCG, maxiter,
-			tolPCG, verbose,
-			re_Y, re_mu, re_alpha, re_eta, re_W, re_cov, re_Sigma_iY, re_Sigma_iX);
-		tau = fitglmmaiRPCG_q(re_Y, X, re_W, tau, re_Sigma_iY,
-			re_Sigma_iX, re_cov, nrun, maxiterPCG, tolPCG,
-			tol, traceCVcutoff, seed);
+
+		// find the next tau
+		for (int itry=1; itry <= 11; itry++)
+		{
+			get_coeff(y, X, tau0, family, alpha0, eta0, offset, maxiterPCG,
+				maxiter, tolPCG, verbose,
+				re_Y, re_mu, re_alpha, re_eta, re_W, re_cov, re_Sigma_iY, re_Sigma_iX);
+			tau = fitglmmaiRPCG_q(re_Y, X, re_W, tau0, re_Sigma_iY,
+				re_Sigma_iX, re_cov, nrun, maxiterPCG, tolPCG,
+				tol, traceCVcutoff, seed);
+			if (max(tau) > tol_inv_2)
+			{
+				if (verbose) print_vec("tau: ", tau, false);
+				if (itry <= 10)
+				{
+					tau0[1] *= 0.5;
+					if (verbose)
+					{
+						Rprintf(", large variance estimate observed, retry (%d) ...\n", itry);
+						print_vec("    set new tau: ", tau0);
+					}
+					continue;
+				} else {
+					if (verbose) Rprintf("\n");
+					throw std::overflow_error(
+					"Large variance estimate observed in the iterations, model not converged!");
+				}
+			}
+			break;
+		}
 
 		cov = re_cov; alpha = re_alpha; eta = re_eta;
 		Y = re_Y; mu = re_mu;
@@ -1066,13 +1124,6 @@ BEGIN_RCPP
 			throw std::overflow_error("Sigma_E = 0, model not converged!");
 		}
 		if (max(abs(tau-tau0) / (abs(tau)+abs(tau0)+tol)) < tol) break;
-		if (max(tau) > tol_inv_2)
-		{
-			throw std::overflow_error(
-				"Large variance estimate observed in the iterations, model not converged!");
-			iter = maxiter + 1;
-			break;
-		}
 	}
 
 	get_coeff(y, X, tau, family, alpha0, eta0, offset, maxiterPCG, maxiter,
@@ -1145,7 +1196,7 @@ BEGIN_RCPP
 	dvec G0(Geno_NumSamp);
 	vector<int> buf_idx(Geno_NumSamp);
 	vector<int> lst_idx;
-	vector<double> lst_maf, lst_var1, lst_var2, lst_ratio;
+	vector<double> lst_maf, lst_mac, lst_var1, lst_var2, lst_ratio;
 
 	while (ratioCV > ratioCVcutoff && snp_idx < num_rand_snp)
 	{
@@ -1163,28 +1214,29 @@ BEGIN_RCPP
 				AC = 2*Num - AC;
 				AF = 1 - AF;
 			}
-			if (AC <= 20) continue;
+			if (AC <= 20) continue;  // suggested by the paper
 
 			// adjusted genotypes
 			dvec G = G0 - noK_XXVX_inv * (noK_XV * G0);
 			dvec g = G / sqrt(AC);
-			dvec Sigma_iG = get_PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
-			dvec adj = Sigma_iX * inv_sympd(symmatu(X1.t() * Sigma_iX)) * X1.t() * Sigma_iG;
+			dvec Sigma_iG = PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
+			dvec adj = Sigma_iX * mat_inv(X1.t() * Sigma_iX) * X1.t() * Sigma_iG;
 
 			double var1 = (sum(G % Sigma_iG) - sum(G % adj)) / AC;
-			double var2 = sum(mu % (1-mu) % g % g);
+			double var2 = sum(mu % (1 - mu) % g % g);
 			double ratio = var1 / var2;
 
 			num_tested ++;
 			lst_idx.push_back(i_snp);
 			lst_maf.push_back(AF);
+			lst_mac.push_back(AC);
 			lst_var1.push_back(var1);
 			lst_var2.push_back(var2);
 			lst_ratio.push_back(ratio);
 			if (verbose)
 			{
-				Rprintf("%6d, maf: %0.4f, var1: %.3g, var2: %.3g, ratio: %0.5f\n",
-					num_tested, AF, var1, var2, ratio);
+				Rprintf("%6d, maf: %0.4f, mac: %g,\tratio: %0.4f (var1: %.3g, var2: %.3g)\n",
+					num_tested, AF, AC, ratio, var1, var2);
 			}
 		}
 
@@ -1202,9 +1254,8 @@ BEGIN_RCPP
 	}
 
 	return DataFrame::create(
-		_["id"] = lst_idx,    _["maf"] = lst_maf,
-		_["var1"] = lst_var1, _["var2"] = lst_var2,
-		_["ratio"] = lst_ratio);
+		_["id"] = lst_idx,    _["maf"] = lst_maf,   _["mac"] = lst_mac,
+		_["var1"] = lst_var1, _["var2"] = lst_var2, _["ratio"] = lst_ratio);
 
 END_RCPP
 }
@@ -1252,7 +1303,7 @@ BEGIN_RCPP
 	dvec G0(Geno_NumSamp);
 	vector<int> buf_idx(Geno_NumSamp);
 	vector<int> lst_idx;
-	vector<double> lst_maf, lst_var1, lst_var2, lst_ratio;
+	vector<double> lst_maf, lst_mac, lst_var1, lst_var2, lst_ratio;
 
 	while (ratioCV > ratioCVcutoff && snp_idx < num_rand_snp)
 	{
@@ -1270,13 +1321,13 @@ BEGIN_RCPP
 				AC = 2*Num - AC;
 				AF = 1 - AF;
 			}
-			if (AC <= 20) continue;
+			if (AC <= 20) continue;  // suggested by the paper
 
 			// adjusted genotypes
 			dvec G = G0 - noK_XXVX_inv * (noK_XV * G0);
 			dvec g = G / sqrt(AC);
-			dvec Sigma_iG = get_PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
-			dvec adj = Sigma_iX * inv_sympd(symmatu(X1.t() * Sigma_iX)) * X1.t() * Sigma_iG;
+			dvec Sigma_iG = PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
+			dvec adj = Sigma_iX * mat_inv(X1.t() * Sigma_iX) * X1.t() * Sigma_iG;
 
 			double var1 = (sum(G % Sigma_iG) - sum(G % adj)) / AC;
 			double var2 = sum(g % g);
@@ -1285,13 +1336,14 @@ BEGIN_RCPP
 			num_tested ++;
 			lst_idx.push_back(i_snp);
 			lst_maf.push_back(AF);
+			lst_mac.push_back(AC);
 			lst_var1.push_back(var1);
 			lst_var2.push_back(var2);
 			lst_ratio.push_back(ratio);
 			if (verbose)
 			{
-				Rprintf("%6d, maf: %0.4f, var1: %.3g, var2: %.3g, ratio: %0.5f\n",
-					num_tested, AF, var1, var2, ratio);
+				Rprintf("%6d, maf: %0.4f, mac: %g,\tratio: %0.4f (var1: %.3g, var2: %.3g)\n",
+					num_tested, AF, AC, ratio, var1, var2);
 			}
 		}
 
@@ -1310,9 +1362,8 @@ BEGIN_RCPP
 	}
 
 	return DataFrame::create(
-		_["id"] = lst_idx,    _["maf"] = lst_maf,
-		_["var1"] = lst_var1, _["var2"] = lst_var2,
-		_["ratio"] = lst_ratio);
+		_["id"] = lst_idx,    _["maf"] = lst_maf,   _["mac"] = lst_mac,
+		_["var1"] = lst_var1, _["var2"] = lst_var2, _["ratio"] = lst_ratio);
 
 END_RCPP
 }

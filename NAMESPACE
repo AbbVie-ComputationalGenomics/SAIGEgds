@@ -1,9 +1,7 @@
 # Export the following names
 useDynLib(SAIGEgds,
-    saige_score_test_init,
-    saige_simd_version,
-    saige_store_2b_geno,
-    saige_store_sp_geno,
+    saige_score_test_init, saige_simd_version,
+    saige_store_2b_geno, saige_store_sp_geno,
     saige_fit_AI_PCG_binary, saige_fit_AI_PCG_quant,
     saige_calc_var_ratio_binary, saige_calc_var_ratio_quant
 )
@@ -14,11 +12,15 @@ exportPattern("^seq*")
 # Import all packages listed as Imports or Depends
 import(methods)
 import(Rcpp)
-importFrom(stats, as.formula, binomial, gaussian, glm, lm, model.frame, model.matrix,
-    model.response, na.omit, sd, var, qnorm)
-importFrom(utils, object.size, packageVersion)
+importFrom(stats, as.formula, binomial, gaussian, glm, lm, model.frame,
+    model.matrix, model.response, na.omit, sd, var, qnorm)
+importFrom(utils, object.size, packageVersion, str)
 importFrom(gdsfmt, createfn.gds, openfn.gds, closefn.gds, index.gdsn, ls.gdsn,
-    add.gdsn, read.gdsn, readex.gdsn, readmode.gdsn, put.attr.gdsn, get.attr.gdsn)
+    add.gdsn, read.gdsn, readex.gdsn, readmode.gdsn, put.attr.gdsn,
+    get.attr.gdsn)
 importFrom(SeqArray, seqOpen, seqClose, seqGetData, seqApply, seqSummary,
     seqParallel, seqResetFilter, seqSetFilter, seqGetFilter, seqSetFilterCond)
 importFrom(RcppParallel, setThreadOptions, RcppParallelLibs)
+
+# Registering S3 methods
+S3method(print, ClassSAIGE_NullModel)

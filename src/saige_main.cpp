@@ -2,7 +2,7 @@
 //
 // saige_main.cpp: SAIGE association analysis
 //
-// Copyright (C) 2019    Xiuwen Zheng / AbbVie-ComputationalGenomics
+// Copyright (C) 2019-2020    Xiuwen Zheng / AbbVie-ComputationalGenomics
 //
 // This file is part of SAIGEgds.
 //
@@ -48,6 +48,7 @@ inline double sq(double v) { return v*v; }
 
 static double threshold_maf = 0;  //< the threshold of MAF filter
 static double threshold_mac = 0;  //< the threshold of MAC filter
+static double threshold_missing = 1;      //< the threshold of missing proportion per variant
 static double threshold_pval_spa = 0.05;  //< the threshold of p-value filter for SPA
 
 static int mod_NSamp = 0;   //< the number of samples
@@ -89,6 +90,8 @@ BEGIN_RCPP
 	if (!R_FINITE(threshold_maf)) threshold_maf = -1;
 	threshold_mac = Rf_asReal(M["mac"]);
 	if (!R_FINITE(threshold_mac)) threshold_mac = -1;
+	threshold_missing = Rf_asReal(M["missing"]);
+	if (!R_FINITE(threshold_missing)) threshold_missing = 1;
 	threshold_pval_spa = Rf_asReal(M["spa.pval"]);
 	if (!R_FINITE(threshold_pval_spa)) threshold_pval_spa = 0.05;
 	// model parameters
@@ -167,9 +170,11 @@ BEGIN_RCPP
 	int Num;
 	f64_af_ac_impute(&G[0], num_samp, AF, AC, Num, buf_index);
 
-	double maf = std::min(AF, 1-AF);
-	double mac = std::min(AC, 2*Num - AC);
-	if (Num>0 && maf>0 && maf>=threshold_maf && mac>=threshold_mac)
+	const double maf = std::min(AF, 1 - AF);
+	const double mac = std::min(AC, 2*Num - AC);
+	const double missing = double(num_samp - Num) / num_samp;
+	if ((Num > 0) && (maf > 0) && (maf >= threshold_maf) &&
+		(mac >= threshold_mac) && (missing <= threshold_missing))
 	{
 		bool minus = (AF > 0.5);
 		if (minus) f64_sub(mod_NSamp, 2, &G[0]);
@@ -239,7 +244,7 @@ BEGIN_RCPP
 		double SE = fabs(beta/::Rf_qnorm5(pval/2, 0, 1, TRUE, FALSE));
 
 		NumericVector ans(6);
-		ans[0] = AF;    ans[1] = AC;    ans[2] = Num;
+		ans[0] = AF;    ans[1] = mac;   ans[2] = Num;
 		ans[3] = beta;  ans[4] = SE;    ans[5] = pval;
 		return ans;
 	} else {
@@ -264,9 +269,11 @@ BEGIN_RCPP
 	int Num;
 	f64_af_ac_impute(&G[0], num_samp, AF, AC, Num, buf_index);
 
-	double maf = std::min(AF, 1-AF);
-	double mac = std::min(AC, 2*Num - AC);
-	if (Num>0 && maf>0 && maf>=threshold_maf && mac>=threshold_mac)
+	const double maf = std::min(AF, 1 - AF);
+	const double mac = std::min(AC, 2*Num - AC);
+	const double missing = double(num_samp - Num) / num_samp;
+	if ((Num > 0) && (maf > 0) && (maf >= threshold_maf) &&
+		(mac >= threshold_mac) && (missing <= threshold_missing))
 	{
 		bool minus = (AF > 0.5);
 		if (minus) f64_sub(mod_NSamp, 2, &G[0]);
@@ -362,8 +369,10 @@ BEGIN_RCPP
 				n_nonzero = f64_nonzero_index(mod_NSamp, &G[0], buf_index);
 
 			// call Saddle_Prob in SPAtest
-			pval = Saddle_Prob_Fast(qtilde, m1, var2, mod_NSamp, mod_mu, buf_adj_g,
-				n_nonzero, buf_index, 2, converged, buf_spa);
+			pval = Saddle_Prob_Fast(qtilde, m1, var2, mod_NSamp, mod_mu,
+				buf_adj_g, n_nonzero, buf_index, 2, converged, buf_spa);
+			if (pval==0 && pval_noadj>0)
+				{ pval = pval_noadj; converged = false; }
 
 			// effect size
 			beta = (Tstat / var1) / sqrt(AC2);
@@ -373,7 +382,7 @@ BEGIN_RCPP
 		double SE = fabs(beta / ::Rf_qnorm5(pval/2, 0, 1, TRUE, FALSE));
 
 		NumericVector ans(8);
-		ans[0] = AF;    ans[1] = AC;    ans[2] = Num;
+		ans[0] = AF;    ans[1] = mac;   ans[2] = Num;
 		ans[3] = beta;  ans[4] = SE;    ans[5] = pval;
 		ans[6] = pval_noadj;
 		ans[7] = converged ? 1 : 0;
