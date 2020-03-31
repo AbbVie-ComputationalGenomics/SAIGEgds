@@ -17,8 +17,8 @@ From: r-base:3.6.1
     Rscript -e "install.packages('BiocManager'); BiocManager::install(c('openssl', 'httr', 'gh', 'knitr', 'rmarkdown', 'Rcpp', 'RcppParallel', 'RcppArmadillo', 'gdsfmt', 'SeqArray', 'SNPRelate', 'SPAtest', 'crayon', 'RUnit'))"
     git clone https://github.com/AbbVie-ComputationalGenomics/SAIGEgds
     R CMD build SAIGEgds
-    R CMD check --no-manual SAIGEgds_1.0.0.tar.gz
-    R CMD INSTALL SAIGEgds_1.0.0.tar.gz
+    R CMD check --no-manual SAIGEgds_1.0.2.tar.gz
+    R CMD INSTALL SAIGEgds_1.0.2.tar.gz
 
 %apprun R
     exec R "$@"

@@ -1,7 +1,7 @@
 ---
-title: "Generalized Mixed Models in PheWAS using SAIGEgds"
+title: "Scalable Generalized Mixed Models in PheWAS using SAIGEgds"
 author: "Xiuwen Zheng (Genomics Research Center, AbbVie, North Chicago)"
-date: "Oct, 2019"
+date: "Mar, 2020"
 output:
     html_document:
         theme: spacelab
@@ -49,6 +49,7 @@ The `BiocManager::install()` approach may require that you build from source, i.
 # Examples
 
 ```{r message=FALSE}
+library(SeqArray)
 library(SAIGEgds)
 
 # the genotype file in SeqArray GDS format (1000 Genomes Phase1, chromosome 22)
@@ -128,18 +129,30 @@ head(assoc)
 assoc[assoc$pval < 5e-4, ]
 ```
 
+The output could be directly saved to an R object file or a GDS file:
+```{r}
+seqAssocGLMM_SPA(geno_fn, glmm, mac=10, parallel=2, res.savefn="assoc.gds")
+
+# open the output GDS file
+(f <- openfn.gds("assoc.gds"))
+# get p-values
+pval <- read.gdsn(index.gdsn(f, "pval"))
+summary(pval)
+closefn.gds(f)
+```
+
 .
 
 ## QQ plot for p-values
 
-```{r fig.width=4.5, fig.height=4.5, fig.align='center'}
+```{r fig.width=4, fig.height=4, fig.align='center'}
 n <- nrow(assoc)
 # expected p-values
 exp.pval <- (1:n) / n
 # observed p-values
 obs.pval <- sort(assoc$pval)
 
-plot(-log10(obs.pval), -log10(exp.pval), xlab="-log10(expected P)", ylab="-log10(observed P)", cex=2/3)
+plot(-log10(exp.pval), -log10(obs.pval), xlab="-log10(expected P)", ylab="-log10(observed P)", cex=2/3)
 abline(0, 1, col="red", lty=2)
 ```
 
@@ -155,7 +168,7 @@ sessionInfo()
 ```
 
 ```{r echo=FALSE}
-unlink("grm_geno.gds", force=TRUE)
+unlink(c("grm_geno.gds", "assoc.gds"), force=TRUE)
 ```
 
 .
@@ -170,8 +183,10 @@ unlink("grm_geno.gds", force=TRUE)
 .
 
 
-# Also See
+# See also
 
 [SeqArray](http://www.bioconductor.org/packages/SeqArray): Data Management of Large-scale Whole-genome Sequence Variant Calls
 
 [SNPRelate](http://www.bioconductor.org/packages/SNPRelate): Parallel Computing Toolset for Relatedness and Principal Component Analysis of SNP Data
+
+[gds2bgen](https://github.com/zhengxwen/gds2bgen): Format conversion from bgen to gds

@@ -282,11 +282,12 @@ seqFitNullGLMM_SPA <- function(formula, data, gdsfile,
             ifelse(num.thread>1L, "s", ""), "\n", sep="")
     }
 
+    X <- model.matrix(formula, data)
+    if (NCOL(X) <= 1L) X.transform <- FALSE
     if (isTRUE(X.transform))
     {
         if (verbose)
             cat("Transform on the design matrix with QR decomposition:\n")
-        X <- model.matrix(formula, data)
         frm <- model.frame(formula, data)
         y <- model.response(frm, type="any")
         # check multi-collinearity

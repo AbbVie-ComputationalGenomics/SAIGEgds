@@ -24,9 +24,10 @@ seqFitNullGLMM_SPA(formula, data, gdsfile, trait.type=c("binary", "quantitative"
         continuous outcomes}
     \item{sample.col}{the column name of sample IDs corresponding to the GDS
         file}
-    \item{maf}{minor allele frequency for imported genotypes,
-        if \code{variant.id=NULL}}
-    \item{missing.rate}{threshold of missing rate, if \code{variant.id=NULL}}
+    \item{maf}{minor allele frequency for imported genotypes (checking >= maf),
+        if \code{variant.id=NULL}; \code{NaN} for no filter}
+    \item{missing.rate}{threshold of missing rate (checking <= missing.rate),
+        if \code{variant.id=NULL}; \code{NaN} for no filter}
     \item{max.num.snp}{the maximum number of SNPs used, or -1 for no limit}
     \item{variant.id}{a list of variant IDs, used to construct GRM}
     \item{inv.norm}{if \code{TRUE}, perform inverse normal transformation on
@@ -62,8 +63,9 @@ seqFitNullGLMM_SPA(formula, data, gdsfile, trait.type=c("binary", "quantitative"
 }
 
 \details{
-    Utilizing the sparse structure of genotypes could significantly improve the
-computational efficiency of model fitting, but it also increases the memory usage.
+    Utilizing the sparse structure of genotypes could significantly improve
+the computational efficiency of model fitting, but it also increases the memory
+usage.
     For more details of SAIGE algorithm, please refer to the SAIGE paper
 [Zhou et al. 2018] (see the reference section).
 }

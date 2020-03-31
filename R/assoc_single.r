@@ -110,7 +110,7 @@ seqAssocGLMM_SPA <- function(gdsfile, modobj, maf=NaN, mac=10, missing=0.1,
     # initialize the internal model parameters
     y <- unname(modobj$obj.noK$y)
     mu <- unname(modobj$fitted.values)
-    X1 <- modobj$obj.noK$X1[ii, ]
+    X1 <- modobj$obj.noK$X1[ii,, drop=FALSE]
     n <- length(ii)
     mobj <- list(
         maf = maf, mac = mac, missing = missing, spa.pval = spa.pval,
@@ -118,20 +118,20 @@ seqAssocGLMM_SPA <- function(gdsfile, modobj, maf=NaN, mac=10, missing=0.1,
         y = y[ii], mu = mu[ii],
         y_mu = (y - mu)[ii],  # y - mu
         mu2 = (mu * (1 - mu))[ii],
-        t_XXVX_inv = t(modobj$obj.noK$XXVX_inv[ii, ]),  # K x n_samp (K << n_samp, more efficient)
-        XV = modobj$obj.noK$XV[, ii],  # K x n_samp
-        t_XVX_inv_XV = t(modobj$obj.noK$XXVX_inv[ii, ] * modobj$obj.noK$V[ii]),  # K x n_samp
+        t_XXVX_inv = t(modobj$obj.noK$XXVX_inv[ii,, drop=FALSE]),  # K x n_samp (K << n_samp, more efficient)
+        XV = modobj$obj.noK$XV[, ii, drop=FALSE],  # K x n_samp
+        t_XVX_inv_XV = t(modobj$obj.noK$XXVX_inv[ii,, drop=FALSE] * modobj$obj.noK$V[ii]),  # K x n_samp
         t_X = t(X1),  # K x n_samp
         var.ratio = var.ratio,
         # buffer
         buf_dosage = double(n),
-        buf_coeff = double(nrow(modobj$obj.noK$XV)),
+        buf_coeff = double(NROW(modobj$obj.noK$XV)),
         buf_adj_g = double(n),
         buf_index = integer(n),
         buf_B = double(n),
         buf_g_tilde = double(n),
         buf_spa = double(n+n),
-        buf_tmp = double(ncol(X1))
+        buf_tmp = double(NCOL(X1))
     )
     if (modobj$trait.type == "binary")
     {
