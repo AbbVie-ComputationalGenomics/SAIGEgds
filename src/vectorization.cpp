@@ -2,7 +2,7 @@
 //
 // vectorization.cpp: optimization with vectorization
 //
-// Copyright (C) 2019    Xiuwen Zheng / AbbVie-ComputationalGenomics
+// Copyright (C) 2019-2020    Xiuwen Zheng / AbbVie-ComputationalGenomics
 //
 // This file is part of SAIGEgds.
 //
@@ -29,41 +29,68 @@ using namespace std;
 
 // ========================================================================= //
 
-#ifdef COREARRAY_TARGET_DEFAULT
-static COREARRAY_TARGET_DEFAULT const char *simd_version() { return "generic"; }
-#endif
-
-#ifdef COREARRAY_TARGET_SSE2
-static COREARRAY_TARGET_SSE2 const char *simd_version() { return "SSE2"; }
-#endif
-
-#ifdef COREARRAY_TARGET_SSE3
-static COREARRAY_TARGET_SSE3 const char *simd_version() { return "SSE3"; }
-#endif
-
-#ifdef COREARRAY_TARGET_AVX
-static COREARRAY_TARGET_AVX const char *simd_version() { return "AVX"; }
-#endif
-
-#ifdef COREARRAY_TARGET_AVX2
-static COREARRAY_TARGET_AVX2 const char *simd_version() { return "AVX2"; }
-#endif
-
-#ifdef COREARRAY_TARGET_AVX512F
-static COREARRAY_TARGET_AVX512F const char *simd_version() { return "AVX512F"; }
-#endif
-
 /// SIMD version
 extern "C" SEXP saige_simd_version()
 {
-	const char *s = simd_version();
 #ifdef COREARRAY_HAVE_TARGET_CLONES
-	char buffer[256];
-	stpncpy(buffer, s, sizeof(buffer));
-	strcpy(buffer+strlen(s), " (FMV)");
-	s = buffer;
+	const bool fmv = true;
+	const bool avx512f = __builtin_cpu_supports("avx512f") != 0;
+	const bool avx2 = __builtin_cpu_supports("avx2") != 0;
+	const bool avx  = __builtin_cpu_supports("avx")  != 0;
+	const bool sse3 = __builtin_cpu_supports("sse3") != 0;
+	const bool sse2 = __builtin_cpu_supports("sse2") != 0;
+#else
+	const bool fmv = false;
+#ifdef __AVX512F__
+	const bool avx512f = true;
+#else
+	const bool avx512f = false;
 #endif
-	return mkString(s);
+#ifdef __AVX2__
+	const bool avx2 = true;
+#else
+	const bool avx2 = false;
+#endif
+#ifdef __AVX__
+	const bool avx = true;
+#else
+	const bool avx = false;
+#endif
+#ifdef __SSE3__
+	const bool sse3 = true;
+#else
+	const bool sse3 = false;
+#endif
+#ifdef __SSE2__
+	const bool sse2 = true;
+#else
+	const bool sse2 = false;
+#endif
+#endif
+	char buffer[256], *p=buffer;
+	if (avx512f)
+	{
+		strcpy(p, "AVX512F"); p += strlen(p);
+	} else if (avx2)
+	{
+		strcpy(p, "AVX2"); p += strlen(p);
+	} else if (avx)
+	{
+		strcpy(p, "AVX"); p += strlen(p);
+	} else if (sse3)
+	{
+		strcpy(p, "SSE3"); p += strlen(p);
+	} else if (sse2)
+	{
+		strcpy(p, "SSE2"); p += strlen(p);
+	} else {
+		strcpy(p, "basic x86"); p += strlen(p);
+	}
+	if (fmv)
+	{
+		strcpy(p, " (FMV)"); p += strlen(p);
+	}
+	return mkString(buffer);
 }
 
 
@@ -71,6 +98,89 @@ extern "C" SEXP saige_simd_version()
 
 namespace vectorization
 {
+
+/// get mean and sd
+COREARRAY_TARGET_CLONES
+	void f64_mean_sd(const double x[], size_t n, double &mean, double &sd)
+{
+	size_t m=0;
+	double sum = 0, sum2 = 0;
+	for (size_t i=0; i < n; i++)
+	{
+		const double v = x[i];
+		if (isfinite(v))
+			{ m++; sum += v; sum2 += v*v; }
+	}
+	mean = sd = R_NaN;
+	if (m > 0)
+	{
+		mean = sum / m;
+		if (m > 1) sd = sqrt((sum2 - sum*sum/m) / (m - 1));
+	}
+}
+
+/// get max and min
+void f64_maxmin(const double x[], size_t n, double &max, double &min)
+{
+	double vmax = -INFINITY, vmin = INFINITY;
+	for (size_t i=0; i < n; i++)
+	{
+		const double v = x[i];
+		if (isfinite(v))
+		{
+			if (v > vmax) vmax = v;
+			if (v < vmin) vmin = v;
+		}
+	}
+	if (!isfinite(vmax)) vmax = R_NaN;
+	if (!isfinite(vmin)) vmin = R_NaN;
+	max = vmax; min = vmin;
+}
+
+/// get max, min, median
+void f64_medmaxmin(const double x[], size_t n, double &med, double &max, double &min)
+{
+	double vmax = -INFINITY, vmin = INFINITY;
+	size_t num = 0;
+	for (size_t i=0; i < n; i++)
+	{
+		const double v = x[i];
+		if (isfinite(v))
+		{
+			if (v > vmax) vmax = v;
+			if (v < vmin) vmin = v;
+			num ++;
+		}
+	}
+	if (!isfinite(vmax)) vmax = R_NaN;
+	if (!isfinite(vmin)) vmin = R_NaN;
+	max = vmax; min = vmin;
+	// find median
+	if (num > 0)
+	{
+		const size_t i1_med = (num - 1) / 2;
+		const size_t i2_med = num / 2;
+		double v1 = R_NaN, v2 = R_NaN;
+		vmin = INFINITY; num = 0;
+		for (size_t i=0; i < n; i++)
+		{
+			const double v = x[i];
+			if (isfinite(v))
+			{
+				if (v <= vmin)
+				{
+					vmin = v;
+					if (num == i1_med) v1 = v;
+					if (num == i2_med) v2 = v;
+					if (num > i2_med) break;
+					num ++;
+				}
+			}
+		}
+		med = (v1 + v2) * 0.5;
+	} else
+		med = R_NaN;
+}
 
 /// return allele frequency and impute genotype using the mean
 COREARRAY_TARGET_CLONES
@@ -144,12 +254,26 @@ COREARRAY_TARGET_CLONES MATH_OFAST
 
 
 /// sum_i x[i]
-COREARRAY_TARGET_CLONES MATH_OFAST
-	double f64_sum(size_t n, const double *x)
+COREARRAY_TARGET_CLONES MATH_OFAST double f64_sum(size_t n, const double *x)
 {
 	double sum = 0;
 	for (size_t i=0; i < n; i++) sum += x[i];
 	return sum;
+}
+
+
+/// x[i] = x[i] / sum_i x[i] (excluding not finite numbers)
+COREARRAY_TARGET_CLONES void f64_normalize(size_t n, double *x)
+{
+	double sum = 0;
+	for (size_t i=0; i < n; i++)
+		if (isfinite(x[i])) sum += x[i];
+	if (sum > 0)
+	{
+		sum = 1 / sum;
+		for (size_t i=0; i < n; i++)
+			if (isfinite(x[i])) x[i] *= sum;
+	}
 }
 
 

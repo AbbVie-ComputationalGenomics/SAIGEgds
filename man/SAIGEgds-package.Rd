@@ -29,6 +29,10 @@ Approximation.
     }
 }
 \references{
+    Zheng X, Davis J.Wade. SAIGEgds -- an efficient statistical tool for
+large-scale PheWAS with mixed models. *Bioinformatics* (2020).
+DOI: 10.1093/bioinformatics/btaa731.
+
     Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN,
 LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC,
 Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S. Efficiently controlling

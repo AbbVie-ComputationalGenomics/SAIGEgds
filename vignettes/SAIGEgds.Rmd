@@ -108,10 +108,18 @@ pheno <- data.frame(
     stringsAsFactors = FALSE)
 head(pheno)
 
-# null model fitting using GRM from grm_fn
 grm_fn
+```
+
+```R
+# null model fitting using GRM from grm_fn
 glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, grm_fn, trait.type="binary", sample.col="sample.id")
 ```
+
+```{r echo=FALSE}
+glmm <- readRDS(system.file("extdata", "v_glmm.rds", package="SAIGEgds"))
+```
+
 
 .
 
@@ -131,14 +139,24 @@ assoc[assoc$pval < 5e-4, ]
 
 The output could be directly saved to an R object file or a GDS file:
 ```{r}
+# save to 'assoc.gds'
 seqAssocGLMM_SPA(geno_fn, glmm, mac=10, parallel=2, res.savefn="assoc.gds")
+```
 
-# open the output GDS file
+Open the output GDS file using the functions in the [gdsfmt](http://www.bioconductor.org/packages/gdsfmt) package:
+```{r}
+# open the GDS file
 (f <- openfn.gds("assoc.gds"))
 # get p-values
 pval <- read.gdsn(index.gdsn(f, "pval"))
 summary(pval)
 closefn.gds(f)
+```
+
+Load association results using the function `seqSAIGE_LoadPval()` in SAIGEgds:
+```{r}
+res <- seqSAIGE_LoadPval("assoc.gds")
+head(res)
 ```
 
 .

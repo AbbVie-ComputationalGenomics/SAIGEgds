@@ -16,7 +16,7 @@ Benchmarks using the UK Biobank White British genotype data (N=430K) with corona
 
 ## Bioconductor:
 
-Release Version: v1.0.2 ([http://www.bioconductor.org/packages/SAIGEgds](http://www.bioconductor.org/packages/SAIGEgds))
+Release Version: v1.8.0 ([http://www.bioconductor.org/packages/SAIGEgds](http://www.bioconductor.org/packages/SAIGEgds))
 
 * [Help Documents](https://rdrr.io/bioc/SAIGEgds/man)
 * [Tutorial](http://www.bioconductor.org/packages/devel/bioc/vignettes/SAIGEgds/inst/doc/SAIGEgds.html)
@@ -30,7 +30,7 @@ Release Version: v1.0.2 ([http://www.bioconductor.org/packages/SAIGEgds](http://
 
 ## Installation
 
-* Requires R (≥ v3.5.0), [gdsfmt](http://www.bioconductor.org/packages/gdsfmt) (≥ v1.20.0), [SeqArray](http://www.bioconductor.org/packages/SeqArray) (≥ v1.24.1)
+* Requires R (≥ v3.5.0), [gdsfmt](http://www.bioconductor.org/packages/gdsfmt) (≥ v1.20.0), [SeqArray](http://www.bioconductor.org/packages/SeqArray) (≥ v1.32.0)
 
 * Recommend [GNU GCC (≥ v6.0)](https://gcc.gnu.org), requiring C++11
 
@@ -46,22 +46,6 @@ The `BiocManager::install()` approach may require that you build from source, i.
 ```R
 library("devtools")
 install_github("AbbVie-ComputationalGenomics/SAIGEgds")
-```
-
-* Singularity container
-
-Build the container 
-```sh
-singularity build R-3.6.1_SAIGEgds.simg R-3.6.1_SAIGEgds.recipe
-```
-Then either process a batch .R file with Rscript:
-```sh
-singularity run --app Rscript R-3.6.1_SAIGEgds.simg <options> <script.R>
-```
-
-Or start an R session:
-```sh
-singularity run --app R R-3.6.1_SAIGEgds.simg
 ```
 
 
@@ -153,7 +137,7 @@ seqClose(geno_gds)
 
 ## Citations
 
-Zheng X, Davis J.Wade. SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models; *Submitted*.
+Zheng X, Davis J.Wade. SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models. *Bioinformatics* (2020). [DOI: 10.1093/bioinformatics/btaa731](http://dx.doi.org/10.1093/bioinformatics/btaa731).
 
 Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S. Efficiently controlling for case-control imbalance and sample relatedness in large-scale genetic association studies. *Nat Genet* (2018). Sep;50(9):1335-1341. [DOI: 10.1038/s41588-018-0184-y](https://www.nature.com/articles/s41588-018-0184-y).
 

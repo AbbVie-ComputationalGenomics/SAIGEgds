@@ -1,31 +1,31 @@
-\name{seqAssocGLMM_SPA}
-\alias{seqAssocGLMM_SPA}
-\title{P-value calculation}
+\name{seqAssocGLMM_spaBurden}
+\alias{seqAssocGLMM_spaBurden}
+\title{Burden tests}
 \description{
-    P-value calculations using variance approximation and an adjustment of
-Saddlepoint approximation.
+    Burden p-value calculations using mixed models and the
+Saddlepoint approximation method for case-control imbalance.
 }
 
 \usage{
-seqAssocGLMM_SPA(gdsfile, modobj, maf=NaN, mac=10, missing=0.1, dsnode="",
-    spa.pval=0.05, var.ratio=NaN, res.savefn="", res.compress="LZMA",
-    parallel=FALSE, verbose=TRUE)
+seqAssocGLMM_spaBurden(gdsfile, modobj, units, wbeta=AggrParamBeta,
+    summac=3, dsnode="", spa.pval=0.05, var.ratio=NaN, res.savefn="",
+    res.compress="LZMA", parallel=FALSE, verbose=TRUE, verbose.maf=TRUE)
 }
 
 \arguments{
     \item{gdsfile}{a SeqArray GDS filename, or a GDS object}
     \item{modobj}{an R object for SAIGE model parameters}
-    \item{maf}{minor allele frequency threshold (checking >= maf), \code{NaN}
-        for no filter}
-    \item{mac}{minor allele count threshold (checking >= mac), \code{NaN}
-        for no filter}
-    \item{missing}{missing threshold for variants (checking <= missing),
-        \code{NaN} for no filter}
+    \item{units}{a list of units of selected variants, with S3 class
+        \code{"SeqUnitListClass"} defined in the SeqArray package}
+    \item{wbeta}{weights for per-variant effect, using beta distribution
+        \code{dbeta()} according to variant's MAF; a length-two vector, or a
+        matrix with two rows for multiple beta parameters; by default, using
+        beta(1,1) and beta(1,25) both}
+    \item{summac}{a threshold for the weighted sum of minor allele counts
+        (checking \code{>= summac})}
     \item{dsnode}{"" for automatically searching the GDS nodes "genotype" and
         "annotation/format/DS", or use a user-defined GDS node in the file}
-    \item{spa.pval}{the p-value threshold for SPA adjustment, 0.05 by default
-        (since normal approximation performs well when the test statistic is
-        close to the mean)}
+    \item{spa.pval}{the p-value threshold for SPA adjustment, 0.05 by default}
     \item{var.ratio}{\code{NaN} for using the estimated variance ratio in the
         model fitting, or a user-defined variance ratio}
     \item{res.savefn}{an RData or GDS file name, "" for no saving}
@@ -37,12 +37,12 @@ seqAssocGLMM_SPA(gdsfile, modobj, maf=NaN, mac=10, missing=0.1, dsnode="",
         \code{\link{seqParallel}}, see \code{\link{seqParallel}} for more
         details}
     \item{verbose}{if \code{TRUE}, show information}
+    \item{verbose.maf}{if \code{TRUE}, show summary of MAFs in units}
 }
 
 \details{
     The original SAIGE R package uses 0.05 as a threshold for unadjusted
-p-values (based on asymptotic normality) to further calculate adjusted
-p-values (Saddlepoint approximation, SPA). If \code{var.ratio=NaN},
+p-values to further calculate SPA-adjusted p-values. If \code{var.ratio=NaN},
 the average of variance ratios (\code{mean(modobj$var.ratio$ratio)}) is used
 instead.
     For more details of SAIGE algorithm, please refer to the SAIGE paper
@@ -52,25 +52,17 @@ instead.
 \value{
     Return a \code{data.frame} with the following components if not saving to
 a file:
-    \item{id}{variant ID in the GDS file;}
-    \item{chr}{chromosome;}
-    \item{pos}{position;}
-    \item{rs.id}{the RS IDs if it is available in the GDS file;}
-    \item{ref}{the reference allele;}
-    \item{alt}{the alternative allele;}
-    \item{AF.alt}{allele frequency for the alternative allele; the minor allele
-        frequency is \code{pmin(AF.alt, 1-AF.alt)};}
-    \item{mac}{minor allele count; the allele count for the alternative allele
-        is \code{ifelse(AF.alt<=0.5, mac, 2*num-mac)};}
-    \item{num}{the number of samples with non-missing genotypes;}
-    \item{beta}{beta coefficient, odds ratio if binary outcomes (alternative
-        allele vs. reference allele);}
-    \item{SE}{standard error for beta coefficient;}
-    \item{pval}{adjusted p-value with the Saddlepoint approximation method;}
+    \code{chr}, chromosome;
+    \code{start}, a starting position;
+    \code{end}, an ending position;
+    \code{numvar}, the number of variants in a window;
+    \code{summac}, the weighted sum of minor allele counts;
+    \code{beta}, beta coefficient, odds ratio if binary outcomes);
+    \code{SE}, standard error for beta coefficient;
+    \code{pval}, adjusted p-value with Saddlepoint approximation;
     \item{p.norm}{p-values based on asymptotic normality (could be 0 if it
         is too small, e.g., \code{pnorm(-50) = 0} in R; used for checking only}
-    \item{converged}{whether the SPA algorithm converges or not for adjusted
-        p-values.}
+    \code{cvg}, whether the SPA algorithm converges or not for adjusted p-value.
 }
 
 \references{
@@ -82,7 +74,7 @@ large-scale genetic association studies. Nat Genet (2018). Sep;50(9):1335-1341.
 }
 \author{Xiuwen Zheng}
 \seealso{
-    \code{\link{seqAssocGLMM_SPA}}, \code{\link{seqSAIGE_LoadPval}}
+    \code{\link{seqAssocGLMM_spaACAT_V}}, \code{\link{seqAssocGLMM_spaACAT_O}}
 }
 
 \examples{
@@ -98,8 +90,10 @@ head(pheno)
 # fit the null model
 glmm <- seqFitNullGLMM_SPA(y ~ x1 + x2, pheno, gdsfile, trait.type="binary")
 
-# p-value calculation
-assoc <- seqAssocGLMM_SPA(gdsfile, glmm, mac=10)
+# get a list of variant units for burden tests
+units <- seqUnitSlidingWindows(gdsfile, win.size=500, win.shift=250)
+
+assoc <- seqAssocGLMM_spaBurden(gdsfile, glmm, units)
 head(assoc)
 
 # close the GDS file

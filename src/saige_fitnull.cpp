@@ -2,7 +2,7 @@
 //
 // saige_fitnull.cpp: C++ implementation of fitting the null model
 //
-// Copyright (C) 2019-2020    Xiuwen Zheng / AbbVie-ComputationalGenomics
+// Copyright (C) 2019-2021    Xiuwen Zheng / AbbVie-ComputationalGenomics
 //
 // This file is part of SAIGEgds. It was created based on the original SAIGE
 // C++ and R codes in the SAIGE package. Compared with the original SAIGE,
@@ -29,7 +29,6 @@
 #include <tbb/parallel_for.h>
 #include <vector>
 #include <algorithm>
-
 
 using namespace std;
 using namespace Rcpp;
@@ -70,7 +69,7 @@ using namespace vectorization;
 #define PARALLEL_FOR(i, SIZE, balancing)    \
 	{  \
 		const int th_idx = 0;  \
-		for (size_t i=0; i < SIZE; i++)
+		for (size_t i=0; i < (size_t)SIZE; i++)
 #define PARALLEL_RANGE(st, ed, SIZE, balancing)    \
 	{  \
 		const int th_idx = 0;  \
@@ -79,6 +78,16 @@ using namespace vectorization;
 
 #endif
 
+
+// ========================================================================= //
+/// SPAtest
+
+extern "C" double Saddle_Prob(double q, double m1, double var1, size_t n_g,
+	const double mu[], const double g[], double cutoff, bool &converged, double *p_noadj);
+
+extern "C" double Saddle_Prob_Fast(double q, double m1, double var1, size_t n_g,
+	const double mu[], const double g[], size_t n_nonzero, const int nonzero_idx[],
+	double cutoff, bool &converged, double buf_spa[], double *p_noadj);
 
 
 // ========================================================================= //
@@ -162,6 +171,9 @@ BEGIN_RCPP
 	// build the look-up table of standardized genotypes
 	init_lookup_table();
 	buf_std_geno = REAL(r_buf_geno);
+#if RCPP_PARALLEL_USE_TBB
+	tbb::task_scheduler_init init(NumThreads);
+#endif
 	PARALLEL_FOR(i, Geno_NumVariant, true)
 	{
 		BYTE *g = Geno_PackedRaw + Geno_PackedNumSamp*i;
@@ -217,13 +229,61 @@ END_RCPP
 /// List vector of sparse structure of genotypes, with a format:
 /// integer vector: n1, n2, n3, n1-length int vector, n2-length, n3-length
 static SEXP Geno_Sparse = NULL;
+/// the number of samples
+static int Geno_Sp_NumSamp = 0;
+/// sparse genotype buffer
+static int *Geno_Sp_Buffer = NULL;
+
+RcppExport SEXP saige_init_sparse(SEXP nsamp, SEXP buffer)
+{
+	Geno_Sp_NumSamp = Rf_asInteger(nsamp);
+	Geno_Sp_Buffer = INTEGER(buffer);
+	return R_NilValue;
+}
 
 /// Get sparse structure of genotypes
-RcppExport SEXP saige_get_sparse(SEXP geno, SEXP buffer)
+RcppExport SEXP saige_get_sparse(SEXP geno)
 {
 BEGIN_RCPP
-	const size_t num = Rf_length(geno);
-	BYTE *gs = (BYTE*)RAW(geno);
+	const size_t num = Geno_Sp_NumSamp;
+	if (num > Rf_length(geno))
+		throw std::invalid_argument("No enough genotypes.");
+
+	void *base_ptr;
+	switch (TYPEOF(geno))
+	{
+		case RAWSXP:
+			base_ptr = RAW(geno); break;
+		case INTSXP:
+			{
+				base_ptr = INTEGER(geno);
+				BYTE *p = (BYTE*)base_ptr;
+				int *s = (int*)base_ptr;
+				for (size_t i=0; i < num; i++)
+					if (0<=s[i] && s[i]<=2) p[i]=s[i]; else p[i]=3;
+			}
+			break;
+		case REALSXP:
+			{
+				base_ptr = REAL(geno);
+				BYTE *p = (BYTE*)base_ptr;
+				double *s = (double*)base_ptr;
+				for (size_t i=0; i < num; i++)
+				{
+					if (R_FINITE(s[i]))
+					{
+						int g = (int)round(s[i]);
+						if (0<=g && g<=2) p[i]=g; else p[i]=3;
+					} else
+						p[i] = 3;
+				}
+			}
+			break;
+		default:
+			throw std::invalid_argument("Invalid data type.");
+	}
+
+	BYTE *gs = (BYTE*)base_ptr;
 	// determine whether need to flip
 	int n=0, sum=0;
 	for (size_t i=0; i < num; i++)
@@ -235,7 +295,7 @@ BEGIN_RCPP
 			if (gs[i] < 3) gs[i] = 2 - gs[i];
 	}
 	// get sparse structure
-	int *base = INTEGER(buffer), *p = base+3;
+	int *base = Geno_Sp_Buffer, *p = base+3;
 	int &n1 = base[0], &n2 = base[1], &n3 = base[2];
 	n1 = n2 = n3 = 0;
 	// genotype: 1
@@ -275,6 +335,9 @@ BEGIN_RCPP
 
 	// build the look-up table of standardized genotypes
 	buf_std_geno = REAL(r_buf_geno);
+#if RCPP_PARALLEL_USE_TBB
+	tbb::task_scheduler_init init(NumThreads);
+#endif
 	PARALLEL_FOR(i, Geno_NumVariant, true)
 	{
 		int *pg = INTEGER(VECTOR_ELT(Geno_Sparse, i));
@@ -862,9 +925,11 @@ static dvec fitglmmaiRPCG_q(const dvec &Y, const dmat &X, const dvec &w,
 // ========================================================================= //
 
 /// Print a numeric vector
-inline static void print_vec(const char *s, dvec &x, bool nl=true)
+inline static void print_vec(const char *s, dvec &x, const char *indent=NULL,
+	bool nl=true)
 {
-	Rprintf("%s(", s);
+	if (!indent) indent = "";
+	Rprintf("%s%s(", indent, s);
 	for (size_t i=0; i < x.n_elem; i++)
 	{
 		if (i > 0) Rprintf(", ");
@@ -875,22 +940,27 @@ inline static void print_vec(const char *s, dvec &x, bool nl=true)
 
 
 // Fitting the null model with binary outcomes
-RcppExport SEXP saige_fit_AI_PCG_binary(SEXP r_fit0, SEXP r_X, SEXP r_tau,
-	SEXP r_param)
+RcppExport SEXP saige_fit_AI_PCG_binary(SEXP r_fit0, SEXP r_X, SEXP r_tau, SEXP r_param)
 {
 BEGIN_RCPP
 
+#if RCPP_PARALLEL_USE_TBB
+	tbb::task_scheduler_init init(NumThreads);
+#endif
 	// parameters for fitting the model
 	List param(r_param);
-	const double tol = Rf_asReal(param["tol"]);
+	const double tol = param["tol"];
 	const double tol_inv_2 = 1 / (tol*tol);
-	const double tolPCG = Rf_asReal(param["tolPCG"]);
-	const int seed = Rf_asInteger(param["seed"]);
-	const int maxiter = Rf_asInteger(param["maxiter"]);
-	const int maxiterPCG = Rf_asInteger(param["maxiterPCG"]);
-	const int nrun = Rf_asInteger(param["nrun"]);
-	const double traceCVcutoff = Rf_asReal(param["traceCVcutoff"]);
+	const double tolPCG = param["tolPCG"];
+	const int seed = param["seed"];
+	const int maxiter = param["maxiter"];
+	const int maxiterPCG = param["maxiterPCG"];
+	const bool no_iteration = Rf_asLogical(param["no_iteration"])==TRUE;
+	const int nrun = param["nrun"];
+	const double traceCVcutoff = param["traceCVcutoff"];
 	const bool verbose = Rf_asLogical(param["verbose"])==TRUE;
+	const char *indent = param["indent"];
+	if (!indent) indent = "";
 
 	List fit0(r_fit0);
 	dvec y = as<dvec>(fit0["y"]);
@@ -911,9 +981,14 @@ BEGIN_RCPP
 	dvec alpha0 = as<dvec>(fit0["coefficients"]);
 	dvec alpha = alpha0;
 	dmat cov;
-
 	dvec tau = as<dvec>(r_tau);
 	dvec tau0 = tau;
+
+	if (verbose && !no_iteration)
+	{
+		Rprintf("%sInitial variance component estimates, tau:\n", indent);
+		Rprintf("%s    Sigma_E: %g, Sigma_G: %g\n", tau[0], tau[1], indent);
+	}
 
 	dvec re_Y, re_mu, re_alpha, re_eta, re_W, re_Sigma_iY;
 	dmat re_cov, re_Sigma_iX;
@@ -921,26 +996,32 @@ BEGIN_RCPP
 		tolPCG, verbose,
 		re_Y, re_mu, re_alpha, re_eta, re_W, re_cov, re_Sigma_iY, re_Sigma_iX);
 
+	if (no_iteration)
+	{
+		return List::create(
+			_["coefficients"] = SEXP_VEC(re_alpha),
+			_["tau"] = SEXP_VEC(tau),
+			_["linear.predictors"] = SEXP_VEC(re_eta),
+			_["fitted.values"] = SEXP_VEC(re_mu),
+			_["residuals"] = SEXP_VEC(y - re_mu),
+			_["cov"] = re_cov,
+			_["converged"] = true);
+	}
+
 	double YPAPY, Trace, AI;
 	get_AI_score(re_Y, X, re_W, tau, re_Sigma_iY, re_Sigma_iX, re_cov, nrun,
 		maxiterPCG, tolPCG, traceCVcutoff, seed,
 		YPAPY, Trace, AI);
 
 	tau[1] = std::max(0.0, tau0[1] + tau0[1]*tau0[1]*(YPAPY - Trace)/y.size());
-	if (verbose)
-	{
-		Rprintf("Initial variance component estimates, tau:\n");
-		Rprintf("    Sigma_E: %g, Sigma_G: %g\n", tau[0], tau[1]);
-	}
-
 	int iter = 1;
 	for (; iter <= maxiter; iter++)
 	{
 		if (verbose)
 		{
-			Rprintf("Iteration %d:\n", iter);
-			print_vec("    tau: ", tau);
-			print_vec("    fixed coeff: ", alpha);
+			Rprintf("%sIteration %d:\n", indent, iter);
+			print_vec("    tau: ", tau, indent);
+			print_vec("    fixed coeff: ", alpha, indent);
 		}
 
 		alpha0 = re_alpha;
@@ -962,13 +1043,14 @@ BEGIN_RCPP
 					tau0[1] *= 0.5;
 					if (verbose)
 					{
-						print_vec("    tau: ", tau, false);
+						print_vec("    tau: ", tau, indent, false);
 						Rprintf(", large variance estimate observed, retry (%d) ...\n", itry);
-						print_vec("    set new tau: ", tau0);
+						print_vec("    set new tau: ", tau0, indent);
 					}
 					continue;
 				} else {
-					if (verbose) print_vec("tau: ", tau);
+					if (verbose)
+						print_vec("tau: ", tau, indent);
 					throw std::overflow_error(
 					"Large variance estimate observed in the iterations, model not converged!");
 				}
@@ -991,8 +1073,8 @@ BEGIN_RCPP
 
 	if (verbose)
 	{
-		print_vec("Final tau: " , tau);
-		print_vec("    fixed coeff: ", alpha);
+		print_vec("Final tau: ", tau, indent);
+		print_vec("    fixed coeff: ", alpha, indent);
 	}
 
 	return List::create(
@@ -1014,17 +1096,22 @@ RcppExport SEXP saige_fit_AI_PCG_quant(SEXP r_fit0, SEXP r_X, SEXP r_tau,
 {
 BEGIN_RCPP
 
+#if RCPP_PARALLEL_USE_TBB
+	tbb::task_scheduler_init init(NumThreads);
+#endif
 	// parameters for fitting the model
 	List param(r_param);
-	const double tol = Rf_asReal(param["tol"]);
+	const double tol = param["tol"];
 	const double tol_inv_2 = 1 / (tol*tol);
-	const double tolPCG = Rf_asReal(param["tolPCG"]);
-	const int seed = Rf_asInteger(param["seed"]);
-	const int maxiter = Rf_asInteger(param["maxiter"]);
-	const int maxiterPCG = Rf_asInteger(param["maxiterPCG"]);
-	const int nrun = Rf_asInteger(param["nrun"]);
-	const double traceCVcutoff = Rf_asReal(param["traceCVcutoff"]);
+	const double tolPCG = param["tolPCG"];
+	const int seed = param["seed"];
+	const int maxiter = param["maxiter"];
+	const int maxiterPCG = param["maxiterPCG"];
+	const int nrun = param["nrun"];
+	const double traceCVcutoff = param["traceCVcutoff"];
 	const bool verbose = Rf_asLogical(param["verbose"])==TRUE;
+	const char *indent = param["indent"];
+	if (!indent) indent = "";
 
 	List fit0(r_fit0);
 	dvec y = as<dvec>(fit0["y"]);
@@ -1046,21 +1133,20 @@ BEGIN_RCPP
 	dvec alpha0 = as<dvec>(fit0["coefficients"]);
 	dvec alpha = alpha0;
 	dmat cov;
-
 	dvec tau = as<dvec>(r_tau);
 	dvec tau0 = tau;
+
+	if (verbose)
+	{
+		Rprintf("%sInitial variance component estimates, tau:\n", indent);
+		Rprintf("%s    Sigma_E: %g, Sigma_G: %g\n", indent, tau[0], tau[1]);
+	}
 
 	dvec re_Y, re_mu, re_alpha, re_eta, re_W, re_Sigma_iY;
 	dmat re_cov, re_Sigma_iX;
 	get_coeff(y, X, tau, family, alpha0, eta0, offset, maxiterPCG, maxiter,
 		tolPCG, verbose,
 		re_Y, re_mu, re_alpha, re_eta, re_W, re_cov, re_Sigma_iY, re_Sigma_iX);
-
-	if (verbose)
-	{
-		Rprintf("Initial variance component estimates, tau:\n");
-		Rprintf("    Sigma_E: %g, Sigma_G: %g\n", tau[0], tau[1]);
-	}
 
 	double YPAPY[2], Trace[2];
 	dmat AI;
@@ -1076,9 +1162,9 @@ BEGIN_RCPP
 	{
 		if (verbose)
 		{
-			Rprintf("Iteration %d:\n", iter);
-			print_vec("    tau: ", tau);
-			print_vec("    fixed coeff: ", alpha);
+			Rprintf("%sIteration %d:\n", indent, iter);
+			print_vec("    tau: ", tau, indent);
+			print_vec("    fixed coeff: ", alpha, indent);
 		}
 
 		alpha0 = re_alpha;
@@ -1096,14 +1182,15 @@ BEGIN_RCPP
 				tol, traceCVcutoff, seed);
 			if (max(tau) > tol_inv_2)
 			{
-				if (verbose) print_vec("tau: ", tau, false);
+				if (verbose)
+					print_vec("tau: ", tau, indent, false);
 				if (itry <= 10)
 				{
 					tau0[1] *= 0.5;
 					if (verbose)
 					{
 						Rprintf(", large variance estimate observed, retry (%d) ...\n", itry);
-						print_vec("    set new tau: ", tau0);
+						print_vec("    set new tau: ", tau0, indent);
 					}
 					continue;
 				} else {
@@ -1120,7 +1207,7 @@ BEGIN_RCPP
 
 		if (tau[0] <= 0)
 		{
-			print_vec("    tau: ", tau);
+			print_vec("    tau: ", tau, indent);
 			throw std::overflow_error("Sigma_E = 0, model not converged!");
 		}
 		if (max(abs(tau-tau0) / (abs(tau)+abs(tau0)+tol)) < tol) break;
@@ -1134,8 +1221,8 @@ BEGIN_RCPP
 
 	if (verbose)
 	{
-		print_vec("Final tau: " , tau);
-		print_vec("    fixed coeff: ", alpha);
+		print_vec("Final tau: " , tau, indent);
+		print_vec("    fixed coeff: ", alpha, indent);
 	}
 
 	return List::create(
@@ -1160,6 +1247,9 @@ RcppExport SEXP saige_calc_var_ratio_binary(SEXP r_fit0, SEXP r_glmm,
 {
 BEGIN_RCPP
 
+#if RCPP_PARALLEL_USE_TBB
+	tbb::task_scheduler_init init(NumThreads);
+#endif
 	List fit0(r_fit0);
 	List glmm(r_glmm);
 	List obj_noK(r_noK);
@@ -1167,10 +1257,10 @@ BEGIN_RCPP
 	IntegerVector rand_index(r_marker_list);
 
 	// parameters for fitting the model
-	const double tolPCG = Rf_asReal(param["tolPCG"]);
-	const int maxiterPCG = Rf_asInteger(param["maxiterPCG"]);
-	const double ratioCVcutoff = Rf_asReal(param["ratioCVcutoff"]);
-	int num_marker = Rf_asInteger(param["num.marker"]);
+	const double tolPCG = param["tolPCG"];
+	const int maxiterPCG = param["maxiterPCG"];
+	const double ratioCVcutoff = param["ratioCVcutoff"];
+	int num_marker = param["num.marker"];
 	const bool verbose = Rf_asLogical(param["verbose"])==TRUE;
 
 	List family = fit0["family"];
@@ -1267,6 +1357,9 @@ RcppExport SEXP saige_calc_var_ratio_quant(SEXP r_fit0, SEXP r_glmm,
 {
 BEGIN_RCPP
 
+#if RCPP_PARALLEL_USE_TBB
+	tbb::task_scheduler_init init(NumThreads);
+#endif
 	List fit0(r_fit0);
 	List glmm(r_glmm);
 	List obj_noK(r_noK);
@@ -1274,10 +1367,10 @@ BEGIN_RCPP
 	IntegerVector rand_index(r_marker_list);
 
 	// parameters for fitting the model
-	const double tolPCG = Rf_asReal(param["tolPCG"]);
-	const int maxiterPCG = Rf_asInteger(param["maxiterPCG"]);
-	const double ratioCVcutoff = Rf_asReal(param["ratioCVcutoff"]);
-	int num_marker = Rf_asInteger(param["num.marker"]);
+	const double tolPCG = param["tolPCG"];
+	const int maxiterPCG = param["maxiterPCG"];
+	const double ratioCVcutoff = param["ratioCVcutoff"];
+	int num_marker = param["num.marker"];
 	const bool verbose = Rf_asLogical(param["verbose"])==TRUE;
 
 	List family = fit0["family"];
@@ -1367,3 +1460,84 @@ BEGIN_RCPP
 
 END_RCPP
 }
+
+
+// ========================================================================= //
+
+/// Calculate the interaction term for binary outcomes
+RcppExport SEXP saige_GxG_snp_bin(SEXP r_fit0, SEXP r_glmm, SEXP inter_term,
+	SEXP r_noK, SEXP r_param, SEXP r_verbose)
+{
+BEGIN_RCPP
+
+#if RCPP_PARALLEL_USE_TBB
+	tbb::task_scheduler_init init(NumThreads);
+#endif
+	List fit0(r_fit0);
+	List glmm(r_glmm);
+	List obj_noK(r_noK);
+	List param(r_param);
+
+	// parameters for fitting the model
+	const double tolPCG = param["tolPCG"];
+	const int maxiterPCG = param["maxiterPCG"];
+	const bool verbose = Rf_asLogical(r_verbose)==TRUE;
+
+	List family = fit0["family"];
+	Function fc_mu_eta = wrap(family["mu.eta"]);
+	Function fc_variance = wrap(family["variance"]);
+
+	dvec eta = as<dvec>(fit0["linear.predictors"]);
+	dvec mu = as<dvec>(fit0["fitted.values"]);
+	dvec mu_eta = as<dvec>(fc_mu_eta(eta));
+	dvec W = (mu_eta % mu_eta) / as<dvec>(fc_variance(mu));
+	dvec tau = as<dvec>(glmm["tau"]);
+	dmat X1 = as<dmat>(obj_noK["X1"]);
+	dmat Sigma_iX = get_sigma_X(W, tau, X1, maxiterPCG, tolPCG);
+
+	dvec y = as<dvec>(fit0["y"]);
+	dmat noK_XXVX_inv = as<dmat>(obj_noK["XXVX_inv"]);
+	dmat noK_XV = as<dmat>(obj_noK["XV"]);
+
+	// interaction term
+	dvec G0 = as<dvec>(inter_term);
+	int n_nonzero = 0;
+	for (size_t i=0; i < G0.size(); i++) if (G0[i] != 0) n_nonzero++;
+
+	// adjusted by covariates
+	dvec G = G0 - noK_XXVX_inv * (noK_XV * G0);  // adj G
+	dvec Sigma_iG = PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
+	dvec adj = Sigma_iX * mat_inv(X1.t() * Sigma_iX) * X1.t() * Sigma_iG;
+
+	double S = sum((y - mu) % G);
+	double var1 = sum(G % Sigma_iG) - sum(G % adj);
+	double var2 = sum(mu % (1 - mu) % G % G);
+	double beta = S / var1;
+	double q = sum(y % G);    // q = sum(y .* adj_g)
+	double m1 = sum(mu % G);  // m1 = sum(mu .* adj_g)
+	double Tstat = q - m1;
+	double qtilde = Tstat/sqrt(var1) * sqrt(var2) + m1;
+
+	// SPA method
+	bool converged=false;
+	double pnorm;
+	double pval = Saddle_Prob(qtilde, m1, var2, G0.size(), &mu[0], &G[0], 2, converged,
+		&pnorm);
+	double SE = fabs(beta / ::Rf_qnorm5(pval/2, 0, 1, TRUE, FALSE));
+
+	if (verbose)
+	{
+		Rprintf(
+			"    Nonzero #: %d(%.3g%%), beta: %.6g, SE: %.6g, pval: %.6g, pnorm: %.6g, tau_G: %.5g\n",
+			n_nonzero, 100.0*n_nonzero/G.size(), beta, SE, pval, pnorm, tau[1]);
+	}
+
+	return DataFrame::create(
+		_["beta"] = beta,  _["SE"] = SE, _["n_nonzero"] = n_nonzero,
+		_["pval"] = pval,  _["p.norm"] = pnorm,
+		_["converged"] = converged, _["tau_G"] = tau[1]
+	);
+
+END_RCPP
+}
+

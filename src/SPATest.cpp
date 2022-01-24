@@ -2,7 +2,7 @@
 //
 // SPATest.cpp: C implementation of part of the R SPATest package
 //
-// Copyright (C) 2019-2020    Xiuwen Zheng / AbbVie-ComputationalGenomics
+// Copyright (C) 2019-2021    Xiuwen Zheng / AbbVie-ComputationalGenomics
 //
 // This file is part of SAIGEgds. It was created based on the R codes in the
 // SPAtest package with the reference:
@@ -39,7 +39,7 @@ inline static double sq(double v) { return v*v; }
 // Cumulant-generating function (CGF) of the score statistic: K(t)
 
 /// The log term of CGF
-inline static COREARRAY_TARGET_CLONES MATH_OFAST  // auto-vectorize if possible
+inline static COREARRAY_TARGET_CLONES
 	double Korg(double t, size_t n_g, const double mu[], const double g[])
 {
 	double sum = 0;
@@ -53,7 +53,7 @@ inline static COREARRAY_TARGET_CLONES MATH_OFAST  // auto-vectorize if possible
 
 
 /// The first term of the first-order derivative of CGF
-inline static COREARRAY_TARGET_CLONES MATH_OFAST  // auto-vectorize if possible
+inline static COREARRAY_TARGET_CLONES
 	double K1_adj(double t, size_t n_g, const double mu[], const double g[],
 		double q)
 {
@@ -236,7 +236,7 @@ inline static double COREARRAY_TARGET_CLONES
 /// Output: p-value
 extern "C" double COREARRAY_TARGET_CLONES
 	Saddle_Prob(double q, double m1, double var1, size_t n_g, const double mu[],
-		const double g[], double cutoff, bool &converged)
+		const double g[], double cutoff, bool &converged, double *p_noadj)
 {
 	double s = q - m1;
 	double qinv = -s + m1;
@@ -245,6 +245,7 @@ extern "C" double COREARRAY_TARGET_CLONES
 	double g_pos=0, g_neg=0;
 	double init=false;
 
+	if (p_noadj) *p_noadj = pval_noadj;
 	while (true)
 	{
 		converged = true;
@@ -299,16 +300,17 @@ extern "C" double COREARRAY_TARGET_CLONES
 	Saddle_Prob_Fast(double q, double m1, double var1, size_t n_g,
 		const double mu[], const double g[], size_t n_nonzero,
 		const int nonzero_idx[], double cutoff, bool &converged,
-		double buf_spa[])
+		double buf_spa[], double *p_noadj)
 {
 	double s = q - m1;
 	double qinv = -s + m1;
 	double pval_noadj = Rf_pchisq(s*s/var1, 1, FALSE, FALSE);
 	double pval;
-	double NAmu, NAsigma;
+	double NAmu=0, NAsigma=0;
 	double g_pos=0, g_neg=0;
 	double init=false;
 
+	if (p_noadj) *p_noadj = pval_noadj;
 	while (true)
 	{
 		converged = true;

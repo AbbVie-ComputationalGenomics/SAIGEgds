@@ -1,13 +1,14 @@
 Package: SAIGEgds
 Type: Package
-Title: Scalable Implementation of Generalized mixed models using GDS files in
-        Phenome-Wide Association Studies
-Version: 1.0.2
-Date: 2020-03-28
-Depends: R (>= 3.5.0), gdsfmt (>= 1.20.0), SeqArray (>= 1.24.1), Rcpp
-LinkingTo: Rcpp, RcppArmadillo, RcppParallel
+Title: Scalable Implementation of Generalized mixed models using GDS
+        files in Phenome-Wide Association Studies
+Version: 1.8.0
+Date: 2021-09-17
+Depends: R (>= 3.5.0), gdsfmt (>= 1.20.0), SeqArray (>= 1.31.8), Rcpp
+LinkingTo: Rcpp, RcppArmadillo, RcppParallel (>= 5.0.0)
 Imports: methods, stats, utils, RcppParallel, SPAtest (>= 3.0.0)
-Suggests: parallel, crayon, RUnit, knitr, BiocGenerics, SNPRelate
+Suggests: parallel, crayon, RUnit, knitr, markdown, rmarkdown,
+        BiocGenerics, SNPRelate
 Authors@R: c(person("Xiuwen", "Zheng", role=c("aut", "cre"),
         email="xiuwen.zheng@abbvie.com", comment=c(ORCID="0000-0002-1390-0708")),
         person("Wei", "Zhou", role="ctb",
@@ -18,7 +19,8 @@ Description: Scalable implementation of generalized mixed models with highly
         (GDS) files. It is designed for single variant tests in large-scale
         phenome-wide association studies (PheWAS) with millions of variants and
         samples, controlling for sample structure and case-control imbalance.
-        The implementation is based on the original SAIGE R package (v0.29.4.4).
+        The implementation is based on the original SAIGE R package (v0.29.4.4
+        for single variant tests, Zhou et al. 2018).
         SAIGEgds also implements some of the SPAtest functions in C to speed up
         the calculation of Saddlepoint approximation. Benchmarks show that
         SAIGEgds is 5 to 6 times faster than the original SAIGE R package.
@@ -28,3 +30,14 @@ VignetteBuilder: knitr
 ByteCompile: TRUE
 URL: https://github.com/AbbVie-ComputationalGenomics/SAIGEgds
 biocViews: Software, Genetics, StatisticalMethod
+git_url: https://git.bioconductor.org/packages/SAIGEgds
+git_branch: RELEASE_3_14
+git_last_commit: ed7a967
+git_last_commit_date: 2021-10-26
+Date/Publication: 2021-10-26
+NeedsCompilation: yes
+Packaged: 2021-10-26 22:39:47 UTC; biocbuild
+Author: Xiuwen Zheng [aut, cre] (<https://orcid.org/0000-0002-1390-0708>),
+  Wei Zhou [ctb] (the original author of the SAIGE R package),
+  J. Wade Davis [ctb]
+Maintainer: Xiuwen Zheng <xiuwen.zheng@abbvie.com>
