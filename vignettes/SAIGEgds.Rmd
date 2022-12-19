@@ -161,19 +161,20 @@ head(res)
 
 .
 
-## QQ plot for p-values
+## Manhattan and QQ plots for p-values
 
-```{r fig.width=4, fig.height=4, fig.align='center'}
-n <- nrow(assoc)
-# expected p-values
-exp.pval <- (1:n) / n
-# observed p-values
-obs.pval <- sort(assoc$pval)
+```{r fig.width=6, fig.height=3, fig.align='center'}
+library(ggmanh)
 
-plot(-log10(exp.pval), -log10(obs.pval), xlab="-log10(expected P)", ylab="-log10(observed P)", cex=2/3)
-abline(0, 1, col="red", lty=2)
+g <- manhattan_plot(assoc, pval.colname="pval", chr.colname="chr", pos.colname="pos",
+    x.label="Chromosome 22")
+g
 ```
 
+```{r fig.width=3, fig.height=3, fig.align='center'}
+# QQ plot
+qqunif(assoc$pval)
+```
 .
 
 .
@@ -195,7 +196,7 @@ unlink(c("grm_geno.gds", "assoc.gds"), force=TRUE)
 # References
 
 1. Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN, LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ, Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S. Efficiently controlling for case-control imbalance and sample relatedness in large-scale genetic association studies. *Nat Genet* (2018). Sep;50(9):1335-1341. [DOI: 10.1038/s41588-018-0184-y](https://doi.org/10.1038/s41588-018-0184-y)
-2. Zheng X, Davis J.Wade, SAIGEgds -- an efficient statistical tool for large-scale PheWAS with mixed models; (Abstract 1920276). *The Annual Meeting of The American Society of Human Genetics (ASHG)*, Oct 15-19, 2019, Houston, US.
+2. Zheng X, Davis J. SAIGEgds – an efficient statistical tool for large-scale PheWAS with mixed models. *Bioinformatics* (2021) [DOI: 10.1093/bioinformatics/btaa731](http://dx.doi.org/10.1093/bioinformatics/btaa731).
 3. Zheng X, Gogarten S, Lawrence M, Stilp A, Conomos M, Weir BS, Laurie C, Levine D. SeqArray -- A storage-efficient high-performance data format for WGS variant calls. *Bioinformatics* (2017). [DOI: 10.1093/bioinformatics/btx145](http://dx.doi.org/10.1093/bioinformatics/btx145).
 
 .
@@ -206,5 +207,3 @@ unlink(c("grm_geno.gds", "assoc.gds"), force=TRUE)
 [SeqArray](http://www.bioconductor.org/packages/SeqArray): Data Management of Large-scale Whole-genome Sequence Variant Calls
 
 [SNPRelate](http://www.bioconductor.org/packages/SNPRelate): Parallel Computing Toolset for Relatedness and Principal Component Analysis of SNP Data
-
-[gds2bgen](https://github.com/zhengxwen/gds2bgen): Format conversion from bgen to gds

@@ -3,7 +3,7 @@
 \title{P-value calculation}
 \description{
     P-value calculations using variance approximation and an adjustment of
-Saddlepoint approximation.
+Saddlepoint approximation in the mixed model framework.
 }
 
 \usage{

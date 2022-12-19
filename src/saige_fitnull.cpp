@@ -41,7 +41,7 @@ using namespace vectorization;
 // Define Intel TBB macro with a thread index starting from 0
 // requiring C++11
 
-#if RCPP_PARALLEL_USE_TBB
+#if defined(RCPP_PARALLEL_USE_TBB) && RCPP_PARALLEL_USE_TBB
 
 #define PARALLEL_HEAD(SIZE, balancing)    \
 	tbb::parallel_for(  \
@@ -64,6 +64,11 @@ using namespace vectorization;
 
 #define PARALLEL_END    });
 
+#define PARALLEL_THREAD_BLOCK    \
+		tbb::task_arena arena(NumThreads); \
+		arena.execute([&]{
+#define PARALLEL_THREAD_BLOCK_END    });
+
 #else
 
 #define PARALLEL_FOR(i, SIZE, balancing)    \
@@ -75,6 +80,9 @@ using namespace vectorization;
 		const int th_idx = 0;  \
 		const size_t st = 0, ed = SIZE;
 #define PARALLEL_END    }
+
+#define PARALLEL_THREAD_BLOCK
+#define PARALLEL_THREAD_BLOCK_END
 
 #endif
 
@@ -171,9 +179,7 @@ BEGIN_RCPP
 	// build the look-up table of standardized genotypes
 	init_lookup_table();
 	buf_std_geno = REAL(r_buf_geno);
-#if RCPP_PARALLEL_USE_TBB
-	tbb::task_scheduler_init init(NumThreads);
-#endif
+	PARALLEL_THREAD_BLOCK
 	PARALLEL_FOR(i, Geno_NumVariant, true)
 	{
 		BYTE *g = Geno_PackedRaw + Geno_PackedNumSamp*i;
@@ -193,6 +199,7 @@ BEGIN_RCPP
 		p[2] = (2 - 2*af) * inv; p[3] = 0;
 	}
 	PARALLEL_END
+	PARALLEL_THREAD_BLOCK_END
 
 	// calculate diag(grm)
 	buf_diag_grm = REAL(r_buf_sigma);
@@ -335,9 +342,7 @@ BEGIN_RCPP
 
 	// build the look-up table of standardized genotypes
 	buf_std_geno = REAL(r_buf_geno);
-#if RCPP_PARALLEL_USE_TBB
-	tbb::task_scheduler_init init(NumThreads);
-#endif
+	PARALLEL_THREAD_BLOCK
 	PARALLEL_FOR(i, Geno_NumVariant, true)
 	{
 		int *pg = INTEGER(VECTOR_ELT(Geno_Sparse, i));
@@ -353,6 +358,7 @@ BEGIN_RCPP
 		p[1] -= p[0]; p[2] -= p[0]; p[3] -= p[0]; // adjustment
 	}
 	PARALLEL_END
+	PARALLEL_THREAD_BLOCK_END
 
 	// calculate diag(grm)
 	buf_diag_grm = REAL(r_buf_sigma);
@@ -944,9 +950,6 @@ RcppExport SEXP saige_fit_AI_PCG_binary(SEXP r_fit0, SEXP r_X, SEXP r_tau, SEXP 
 {
 BEGIN_RCPP
 
-#if RCPP_PARALLEL_USE_TBB
-	tbb::task_scheduler_init init(NumThreads);
-#endif
 	// parameters for fitting the model
 	List param(r_param);
 	const double tol = param["tol"];
@@ -987,14 +990,16 @@ BEGIN_RCPP
 	if (verbose && !no_iteration)
 	{
 		Rprintf("%sInitial variance component estimates, tau:\n", indent);
-		Rprintf("%s    Sigma_E: %g, Sigma_G: %g\n", tau[0], tau[1], indent);
+		Rprintf("%s    Sigma_E: %g, Sigma_G: %g\n", indent, tau[0], tau[1]);
 	}
 
 	dvec re_Y, re_mu, re_alpha, re_eta, re_W, re_Sigma_iY;
 	dmat re_cov, re_Sigma_iX;
+	{ PARALLEL_THREAD_BLOCK
 	get_coeff(y, X, tau, family, alpha0, eta0, offset, maxiterPCG, maxiter,
 		tolPCG, verbose,
 		re_Y, re_mu, re_alpha, re_eta, re_W, re_cov, re_Sigma_iY, re_Sigma_iX);
+	PARALLEL_THREAD_BLOCK_END }
 
 	if (no_iteration)
 	{
@@ -1008,13 +1013,15 @@ BEGIN_RCPP
 			_["converged"] = true);
 	}
 
+	int iter = 1;
+	{ PARALLEL_THREAD_BLOCK
+
 	double YPAPY, Trace, AI;
 	get_AI_score(re_Y, X, re_W, tau, re_Sigma_iY, re_Sigma_iX, re_cov, nrun,
 		maxiterPCG, tolPCG, traceCVcutoff, seed,
 		YPAPY, Trace, AI);
 
 	tau[1] = std::max(0.0, tau0[1] + tau0[1]*tau0[1]*(YPAPY - Trace)/y.size());
-	int iter = 1;
 	for (; iter <= maxiter; iter++)
 	{
 		if (verbose)
@@ -1071,6 +1078,8 @@ BEGIN_RCPP
 	cov = re_cov; alpha = re_alpha; eta = re_eta;
 	Y = re_Y; mu = re_mu;
 
+	PARALLEL_THREAD_BLOCK_END }
+
 	if (verbose)
 	{
 		print_vec("Final tau: ", tau, indent);
@@ -1096,9 +1105,6 @@ RcppExport SEXP saige_fit_AI_PCG_quant(SEXP r_fit0, SEXP r_X, SEXP r_tau,
 {
 BEGIN_RCPP
 
-#if RCPP_PARALLEL_USE_TBB
-	tbb::task_scheduler_init init(NumThreads);
-#endif
 	// parameters for fitting the model
 	List param(r_param);
 	const double tol = param["tol"];
@@ -1142,6 +1148,9 @@ BEGIN_RCPP
 		Rprintf("%s    Sigma_E: %g, Sigma_G: %g\n", indent, tau[0], tau[1]);
 	}
 
+	int iter = 1;
+	PARALLEL_THREAD_BLOCK
+
 	dvec re_Y, re_mu, re_alpha, re_eta, re_W, re_Sigma_iY;
 	dmat re_cov, re_Sigma_iX;
 	get_coeff(y, X, tau, family, alpha0, eta0, offset, maxiterPCG, maxiter,
@@ -1157,7 +1166,6 @@ BEGIN_RCPP
 	tau[0] = std::max(0.0, tau0[0] + tau0[0]*tau0[0]*(YPAPY[1] - Trace[0])/n);
 	tau[1] = std::max(0.0, tau0[1] + tau0[1]*tau0[1]*(YPAPY[0] - Trace[1])/n);
 
-	int iter = 1;
 	for (; iter <= maxiter; iter++)
 	{
 		if (verbose)
@@ -1219,6 +1227,8 @@ BEGIN_RCPP
 	cov = re_cov; alpha = re_alpha; eta = re_eta;
 	Y = re_Y; mu = re_mu;
 
+	PARALLEL_THREAD_BLOCK_END
+
 	if (verbose)
 	{
 		print_vec("Final tau: " , tau, indent);
@@ -1247,9 +1257,6 @@ RcppExport SEXP saige_calc_var_ratio_binary(SEXP r_fit0, SEXP r_glmm,
 {
 BEGIN_RCPP
 
-#if RCPP_PARALLEL_USE_TBB
-	tbb::task_scheduler_init init(NumThreads);
-#endif
 	List fit0(r_fit0);
 	List glmm(r_glmm);
 	List obj_noK(r_noK);
@@ -1266,6 +1273,10 @@ BEGIN_RCPP
 	List family = fit0["family"];
 	Function fc_mu_eta = wrap(family["mu.eta"]);
 	Function fc_variance = wrap(family["variance"]);
+
+	vector<int> lst_idx;
+	vector<double> lst_maf, lst_mac, lst_var1, lst_var2, lst_ratio;
+	PARALLEL_THREAD_BLOCK
 
 	dvec eta = as<dvec>(fit0["linear.predictors"]);
 	dvec mu = as<dvec>(fit0["fitted.values"]);
@@ -1285,8 +1296,6 @@ BEGIN_RCPP
 
 	dvec G0(Geno_NumSamp);
 	vector<int> buf_idx(Geno_NumSamp);
-	vector<int> lst_idx;
-	vector<double> lst_maf, lst_mac, lst_var1, lst_var2, lst_ratio;
 
 	while (ratioCV > ratioCVcutoff && snp_idx < num_rand_snp)
 	{
@@ -1343,6 +1352,8 @@ BEGIN_RCPP
 		}
 	}
 
+	PARALLEL_THREAD_BLOCK_END
+
 	return DataFrame::create(
 		_["id"] = lst_idx,    _["maf"] = lst_maf,   _["mac"] = lst_mac,
 		_["var1"] = lst_var1, _["var2"] = lst_var2, _["ratio"] = lst_ratio);
@@ -1357,9 +1368,6 @@ RcppExport SEXP saige_calc_var_ratio_quant(SEXP r_fit0, SEXP r_glmm,
 {
 BEGIN_RCPP
 
-#if RCPP_PARALLEL_USE_TBB
-	tbb::task_scheduler_init init(NumThreads);
-#endif
 	List fit0(r_fit0);
 	List glmm(r_glmm);
 	List obj_noK(r_noK);
@@ -1376,6 +1384,10 @@ BEGIN_RCPP
 	List family = fit0["family"];
 	Function fc_mu_eta = wrap(family["mu.eta"]);
 	Function fc_variance = wrap(family["variance"]);
+
+	vector<int> lst_idx;
+	vector<double> lst_maf, lst_mac, lst_var1, lst_var2, lst_ratio;
+	PARALLEL_THREAD_BLOCK
 
 	dvec eta = as<dvec>(fit0["linear.predictors"]);
 	dvec mu = as<dvec>(fit0["fitted.values"]);
@@ -1395,8 +1407,6 @@ BEGIN_RCPP
 
 	dvec G0(Geno_NumSamp);
 	vector<int> buf_idx(Geno_NumSamp);
-	vector<int> lst_idx;
-	vector<double> lst_maf, lst_mac, lst_var1, lst_var2, lst_ratio;
 
 	while (ratioCV > ratioCVcutoff && snp_idx < num_rand_snp)
 	{
@@ -1454,6 +1464,8 @@ BEGIN_RCPP
 		}
 	}
 
+	PARALLEL_THREAD_BLOCK_END
+
 	return DataFrame::create(
 		_["id"] = lst_idx,    _["maf"] = lst_maf,   _["mac"] = lst_mac,
 		_["var1"] = lst_var1, _["var2"] = lst_var2, _["ratio"] = lst_ratio);
@@ -1470,9 +1482,6 @@ RcppExport SEXP saige_GxG_snp_bin(SEXP r_fit0, SEXP r_glmm, SEXP inter_term,
 {
 BEGIN_RCPP
 
-#if RCPP_PARALLEL_USE_TBB
-	tbb::task_scheduler_init init(NumThreads);
-#endif
 	List fit0(r_fit0);
 	List glmm(r_glmm);
 	List obj_noK(r_noK);
@@ -1493,7 +1502,11 @@ BEGIN_RCPP
 	dvec W = (mu_eta % mu_eta) / as<dvec>(fc_variance(mu));
 	dvec tau = as<dvec>(glmm["tau"]);
 	dmat X1 = as<dmat>(obj_noK["X1"]);
-	dmat Sigma_iX = get_sigma_X(W, tau, X1, maxiterPCG, tolPCG);
+	dmat Sigma_iX;
+
+	{ PARALLEL_THREAD_BLOCK
+	Sigma_iX = get_sigma_X(W, tau, X1, maxiterPCG, tolPCG);
+	PARALLEL_THREAD_BLOCK_END }
 
 	dvec y = as<dvec>(fit0["y"]);
 	dmat noK_XXVX_inv = as<dmat>(obj_noK["XXVX_inv"]);
@@ -1506,7 +1519,10 @@ BEGIN_RCPP
 
 	// adjusted by covariates
 	dvec G = G0 - noK_XXVX_inv * (noK_XV * G0);  // adj G
-	dvec Sigma_iG = PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
+	dvec Sigma_iG;
+	{ PARALLEL_THREAD_BLOCK
+	Sigma_iG = PCG_diag_sigma(W, tau, G, maxiterPCG, tolPCG);
+	PARALLEL_THREAD_BLOCK_END }
 	dvec adj = Sigma_iX * mat_inv(X1.t() * Sigma_iX) * X1.t() * Sigma_iG;
 
 	double S = sum((y - mu) % G);

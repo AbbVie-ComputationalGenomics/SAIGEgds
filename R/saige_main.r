@@ -677,7 +677,7 @@ glmmHeritability <- function(modobj, adjust=TRUE)
         {
             y <- unname(modobj$obj.noK$y)
             p <- sum(y==1) / length(y)
-            # based on Supplementary Table 7 (Zhou et al. 2018)
+            # coefficients are based on Supplementary Table 7 (Zhou et al. 2018)
             r <- 2.970 + 0.372*log10(p)
         }
         h <- tau / (pi*pi/3 + tau) * r

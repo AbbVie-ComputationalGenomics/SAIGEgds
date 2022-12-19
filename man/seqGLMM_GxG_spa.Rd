@@ -24,7 +24,7 @@ seqGLMM_GxG_spa(formula, data, gds_grm, gds_assoc, snp_pair,
     \item{gds_assoc}{a SeqArray GDS filename, a GDS object, or a 0/1/2/NA
         matrix with row names for sample IDs}
     \item{snp_pair}{a \code{data.frame} with the first two columns for the
-        variant IDs in \code{gds_assoc}}
+        variant IDs (i.e., 'variant.id') in \code{gds_assoc}}
     \item{trait.type}{"binary" for binary outcomes, "quantitative" for
         continuous outcomes}
     \item{sample.col}{the column name of sample IDs corresponding to the GDS
@@ -33,7 +33,8 @@ seqGLMM_GxG_spa(formula, data, gds_grm, gds_assoc, snp_pair,
         if \code{variant.id=NULL}; \code{NaN} for no filter}
     \item{missing.rate}{threshold of missing rate (checking <= missing.rate),
         if \code{variant.id=NULL}; \code{NaN} for no filter}
-    \item{max.num.snp}{the maximum number of SNPs used, or -1 for no limit}
+    \item{max.num.snp}{the maximum number of SNPs used in the calculation of
+        GRM, or -1 for no limit}
     \item{variant.id}{a list of variant IDs, used to construct GRM}
     \item{inv.norm}{if \code{TRUE}, perform inverse normal transformation on
         residuals for quantitative outcomes, see the reference [Sofer, 2019]}
@@ -97,13 +98,6 @@ seqGLMM_GxG_spa(formula, data, gds_grm, gds_assoc, snp_pair,
     \item{p.glm.norm}{glm p-value without SPA calculation}
 }
 
-\references{
-    Zhou W, Nielsen JB, Fritsche LG, Dey R, Gabrielsen ME, Wolford BN,
-LeFaive J, VandeHaar P, Gagliano SA, Gifford A, Bastarache LA, Wei WQ,
-Denny JC, Lin M, Hveem K, Kang HM, Abecasis GR, Willer CJ, Lee S.
-Efficiently controlling for case-control imbalance and sample relatedness in
-large-scale genetic association studies. Nat Genet (2018). Sep;50(9):1335-1341.
-}
 \author{Xiuwen Zheng}
 \seealso{
     \code{\link{seqFitNullGLMM_SPA}}, \code{\link{seqAssocGLMM_SPA}}

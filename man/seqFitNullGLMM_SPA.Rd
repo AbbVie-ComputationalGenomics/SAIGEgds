@@ -19,7 +19,8 @@ seqFitNullGLMM_SPA(formula, data, gdsfile, trait.type=c("binary", "quantitative"
     \item{formula}{an object of class \code{formula} (or one that can be
         coerced to that class), e.g., \code{y ~ x1 + x2}, see \code{\link{lm}}}
     \item{data}{a data frame for the formulas}
-    \item{gdsfile}{a SeqArray GDS filename, or a GDS object}
+    \item{gdsfile}{a SeqArray GDS filename or a GDS object for genotypes used
+        in the GRM calculation}
     \item{trait.type}{"binary" for binary outcomes, "quantitative" for
         continuous outcomes}
     \item{sample.col}{the column name of sample IDs corresponding to the GDS

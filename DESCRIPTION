@@ -1,14 +1,14 @@
 Package: SAIGEgds
 Type: Package
-Title: Scalable Implementation of Generalized mixed models using GDS
-        files in Phenome-Wide Association Studies
-Version: 1.8.0
-Date: 2021-09-17
+Title: Scalable Implementation of Generalized mixed models using GDS files in
+        Phenome-Wide Association Studies
+Version: 1.12.1
+Date: 2022-12-15
 Depends: R (>= 3.5.0), gdsfmt (>= 1.20.0), SeqArray (>= 1.31.8), Rcpp
 LinkingTo: Rcpp, RcppArmadillo, RcppParallel (>= 5.0.0)
 Imports: methods, stats, utils, RcppParallel, SPAtest (>= 3.0.0)
-Suggests: parallel, crayon, RUnit, knitr, markdown, rmarkdown,
-        BiocGenerics, SNPRelate
+Suggests: parallel, crayon, RUnit, knitr, markdown, rmarkdown, BiocGenerics,
+        SNPRelate, ggmanh
 Authors@R: c(person("Xiuwen", "Zheng", role=c("aut", "cre"),
         email="xiuwen.zheng@abbvie.com", comment=c(ORCID="0000-0002-1390-0708")),
         person("Wei", "Zhou", role="ctb",
@@ -29,15 +29,4 @@ SystemRequirements: C++11, GNU make
 VignetteBuilder: knitr
 ByteCompile: TRUE
 URL: https://github.com/AbbVie-ComputationalGenomics/SAIGEgds
-biocViews: Software, Genetics, StatisticalMethod
-git_url: https://git.bioconductor.org/packages/SAIGEgds
-git_branch: RELEASE_3_14
-git_last_commit: ed7a967
-git_last_commit_date: 2021-10-26
-Date/Publication: 2021-10-26
-NeedsCompilation: yes
-Packaged: 2021-10-26 22:39:47 UTC; biocbuild
-Author: Xiuwen Zheng [aut, cre] (<https://orcid.org/0000-0002-1390-0708>),
-  Wei Zhou [ctb] (the original author of the SAIGE R package),
-  J. Wade Davis [ctb]
-Maintainer: Xiuwen Zheng <xiuwen.zheng@abbvie.com>
+biocViews: Software, Genetics, StatisticalMethod, GenomeWideAssociation
