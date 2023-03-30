@@ -253,7 +253,7 @@ RcppExport SEXP saige_get_sparse(SEXP geno)
 {
 BEGIN_RCPP
 	const size_t num = Geno_Sp_NumSamp;
-	if (num > Rf_length(geno))
+	if (num > (size_t)Rf_length(geno))
 		throw std::invalid_argument("No enough genotypes.");
 
 	void *base_ptr;

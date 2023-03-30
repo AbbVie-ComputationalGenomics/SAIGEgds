@@ -12,7 +12,7 @@ LIB_GCC=$(if ${GCC_FLAG},-lgcc)
 
 
 # additional preprocessor options
-PKG_CXXFLAGS += -DRCPP_PARALLEL_USE_TBB=0
+PKG_CXXFLAGS += -DRCPP_PARALLEL_USE_TBB=1
 
 # to set flags for the linker
 PKG_LIBS = -lm $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) \
